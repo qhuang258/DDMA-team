@@ -10,3 +10,5 @@
 - **冲刺计划**：[SprintReleasePlan.md](SprintReleasePlan.md)
 - **后端与数据层技术选型讨论**：[BackendTechStackDiscussion.md](BackendTechStackDiscussion.md)
 - **Java 后端分层架构与数据库 ER**：[JavaBackendArchitecture.md](JavaBackendArchitecture.md)
+
+## PostgreSQL Installation (for develop)
