@@ -18,6 +18,136 @@
 下图**刻意做粗粒度抽象**，对齐先前 **OnlineOrder** 示意图：每层只有少数「大块」组件；**Customer** 一侧同时承担**身份与认证**（类似示例里 `CustomerController` / `CustomerService` 与安全组件的关系）。具体类名可在实现时再拆分包内私有组件，**不必**与下图一一对应。
 
 ```mermaid
+flowchart LR
+  %% Client
+  CLIENT[Web / Mobile Client]
+
+  %% Application
+  APP[DeliveryPlanningApplication]
+
+  %% Controllers
+  subgraph CL[Controller Layer]
+    AC[AuthController]
+    ODC[OrderController]
+    PLC[PlanController]
+    TRC[TrackingController]
+    PYC[PaymentController]
+    ADC[AdminController]
+  end
+
+  %% Services
+  subgraph SL[Service Layer]
+    AUS[AuthService]
+    ODS[OrderService]
+    PLS[PlanningService]
+    TRS[TrackingService]
+    PYS[PaymentService]
+    ADS[AdminService]
+    NS[NotificationService]
+  end
+
+  %% Repositories
+  subgraph RL[Repository Layer]
+    UR[UserRepository]
+    ORR[OrderRepository]
+    PR[PlanRepository]
+    RR[RouteRepository]
+    RSR[RouteStopRepository]
+    VR[VehicleRepository]
+    PYR[PaymentRepository]
+    CR[PromoCodeRepository]
+  end
+
+  %% Security / Config
+  subgraph CFG[Security / Config]
+    SFC[SecurityFilterChain]
+    UDM[UserDetailsService]
+    PE[PasswordEncoder]
+    CFGC[AppConfig]
+  end
+
+  %% Database
+  subgraph DB[Persistence]
+    PG[(PostgreSQL)]
+    GIS[(PostGIS)]
+    REDIS[(Redis)]
+    OBJ[(S3 / MinIO)]
+  end
+
+  %% External APIs
+  subgraph EXT[External Integrations]
+    MAP[Map / Geocoding API]
+    STRIPE[Stripe API]
+    PUSH[Push Service]
+    WEATHER[Weather API]
+  end
+
+  %% Entry
+  CLIENT --> AC
+  CLIENT --> ODC
+  CLIENT --> PLC
+  CLIENT --> TRC
+  CLIENT --> PYC
+  CLIENT --> ADC
+
+  APP --> CL
+
+  %% Controller -> Service
+  AC --> AUS
+  ODC --> ODS
+  PLC --> PLS
+  TRC --> TRS
+  PYC --> PYS
+  ADC --> ADS
+
+  %% Service collaborations
+  ODS --> PLS
+  ODS --> PYS
+  ODS --> NS
+  TRS --> NS
+  ADS --> ODS
+
+  %% Service -> Repository
+  AUS --> UR
+  ODS --> ORR
+  ODS --> VR
+  ODS --> CR
+  PLS --> PR
+  PLS --> RR
+  PLS --> RSR
+  TRS --> ORR
+  TRS --> RR
+  PYS --> PYR
+  ADS --> UR
+  ADS --> ORR
+
+  %% Repository -> DB
+  UR --> PG
+  ORR --> PG
+  PR --> PG
+  RR --> PG
+  RSR --> PG
+  VR --> PG
+  PYR --> PG
+  CR --> PG
+  PG --> GIS
+
+  %% Service -> Cache / Object Storage / External
+  TRS --> REDIS
+  AUS --> REDIS
+  ODS --> OBJ
+  PLS --> MAP
+  PLS --> WEATHER
+  PYS --> STRIPE
+  NS --> PUSH
+
+  %% Security wiring
+  SFC --> CFGC
+  UDM --> CFGC
+  PE --> CFGC
+  AUS --> UDM
+  AUS --> PE
+
 flowchart TB
   subgraph controllers [Controller layer]
     CustomerController[CustomerController]
