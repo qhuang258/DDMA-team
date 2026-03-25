@@ -18,6 +18,157 @@
 下图**刻意做粗粒度抽象**，对齐先前 **OnlineOrder** 示意图：每层只有少数「大块」组件；**Customer** 一侧同时承担**身份与认证**（类似示例里 `CustomerController` / `CustomerService` 与安全组件的关系）。具体类名可在实现时再拆分包内私有组件，**不必**与下图一一对应。
 
 ```mermaid
+erDiagram
+    USERS {
+        bigint id PK
+        string email
+        string password_hash
+        string full_name
+        string phone
+        string role
+        datetime created_at
+        datetime updated_at
+    }
+
+    OAUTH_LINKS {
+        bigint id PK
+        bigint user_id FK
+        string provider
+        string provider_user_id
+        datetime created_at
+    }
+
+    VEHICLES {
+        bigint id PK
+        string plate_number
+        string type
+        string status
+        int capacity
+        datetime created_at
+    }
+
+    ORDERS {
+        bigint id PK
+        bigint user_id FK
+        bigint vehicle_id FK
+        string order_number
+        string status
+        decimal total_amount
+        string pickup_address
+        string delivery_address
+        decimal pickup_lat
+        decimal pickup_lng
+        decimal delivery_lat
+        decimal delivery_lng
+        datetime created_at
+        datetime updated_at
+    }
+
+    PAYMENTS {
+        bigint id PK
+        bigint order_id FK
+        string provider
+        string payment_intent_id
+        decimal amount
+        string status
+        datetime paid_at
+        datetime created_at
+    }
+
+    PROMO_CODES {
+        bigint id PK
+        string code
+        string discount_type
+        decimal discount_value
+        datetime valid_from
+        datetime valid_to
+        int usage_limit
+        datetime created_at
+    }
+
+    ORDER_PROMOS {
+        bigint id PK
+        bigint order_id FK
+        bigint promo_code_id FK
+        decimal discount_amount
+        datetime created_at
+    }
+
+    PLANS {
+        bigint id PK
+        string name
+        string status
+        date plan_date
+        datetime created_at
+    }
+
+    ROUTES {
+        bigint id PK
+        bigint plan_id FK
+        bigint vehicle_id FK
+        string route_code
+        int stop_count
+        decimal total_distance_km
+        decimal estimated_duration_min
+        string status
+        datetime created_at
+    }
+
+    ROUTE_STOPS {
+        bigint id PK
+        bigint route_id FK
+        bigint order_id FK
+        int stop_sequence
+        string stop_type
+        string address
+        decimal latitude
+        decimal longitude
+        string status
+        datetime eta
+        datetime completed_at
+    }
+
+    TRACKING_EVENTS {
+        bigint id PK
+        bigint order_id FK
+        bigint route_stop_id FK
+        string event_type
+        string event_status
+        decimal latitude
+        decimal longitude
+        datetime occurred_at
+    }
+
+    DELIVERY_PROOFS {
+        bigint id PK
+        bigint order_id FK
+        bigint route_stop_id FK
+        string file_url
+        string proof_type
+        datetime uploaded_at
+    }
+
+    USERS ||--o{ ORDERS : places
+    USERS ||--o{ OAUTH_LINKS : links
+    VEHICLES ||--o{ ORDERS : assigned_to
+    VEHICLES ||--o{ ROUTES : serves
+
+    ORDERS ||--o{ PAYMENTS : has
+    ORDERS ||--o{ ORDER_PROMOS : uses
+    PROMO_CODES ||--o{ ORDER_PROMOS : applied_in
+
+    PLANS ||--o{ ROUTES : contains
+    ROUTES ||--o{ ROUTE_STOPS : includes
+    ORDERS ||--o{ ROUTE_STOPS : delivered_via
+
+    ORDERS ||--o{ TRACKING_EVENTS : generates
+    ROUTE_STOPS ||--o{ TRACKING_EVENTS : records
+
+    ORDERS ||--o{ DELIVERY_PROOFS : has
+    ROUTE_STOPS ||--o{ DELIVERY_PROOFS : confirms
+```
+
+```mermaid
 flowchart LR
   %% Client
   CLIENT[Web / Mobile Client]
