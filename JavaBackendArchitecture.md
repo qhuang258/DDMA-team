@@ -147,6 +147,8 @@ flowchart LR
   PE --> CFGC
   AUS --> UDM
   AUS --> PE
+```
+
 ```mermaid
 flowchart TB
   subgraph controllers [Controller layer]
