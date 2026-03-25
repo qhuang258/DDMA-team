@@ -260,104 +260,7 @@ flowchart LR
   DR --> DCR
   DR --> FVR
 ```
-```mermaid
-flowchart TB
-  %% ===== Clients =====
-  CLIENT[Web / Mobile Client]
 
-  %% ===== API Layer =====
-  subgraph API[MVP API Layer]
-    AUTH_API[Auth API]
-    PLAN_API[Planning API]
-    ORDER_API[Order API]
-    TRACK_API[Tracking API]
-    WEBHOOK_API[Stripe Webhook API]
-  end
-
-  %% ===== Core Services =====
-  subgraph CORE[MVP Core Services]
-    IDENTITY[Identity Service]
-    ELIGIBILITY[Eligibility & Pricing Service]
-    ORDERING[Order Management Service]
-    TRACKING[Tracking Service]
-    PAYMENT[Payment Orchestration Service]
-  end
-
-  %% ===== Domain Data =====
-  subgraph DATA[MVP Data Storage]
-    USERS[(Users)]
-    OTP[(OTP Challenges)]
-    CENTERS[(Delivery Centers)]
-    FLEET[(Fleet Inventory)]
-    ORDERS[(Orders)]
-    PARCELS[(Order Parcels)]
-    PAYMENTS[(Payments)]
-  end
-
-  %% ===== External Dependencies =====
-  subgraph EXT[External Services]
-    MAP[Map / Geocoding API]
-    STRIPE[Stripe API]
-  end
-
-  %% ===== Platform / Security =====
-  subgraph PLATFORM[Security & Runtime]
-    JWT[JWT Auth / Security Filter]
-    CONFIG[App Config]
-    SEED[Dev Seed Data]
-  end
-
-  %% ===== Client Entry =====
-  CLIENT --> AUTH_API
-  CLIENT --> PLAN_API
-  CLIENT --> ORDER_API
-  CLIENT --> TRACK_API
-
-  %% ===== API to Services =====
-  AUTH_API --> IDENTITY
-  PLAN_API --> ELIGIBILITY
-  ORDER_API --> ORDERING
-  ORDER_API --> PAYMENT
-  TRACK_API --> TRACKING
-  WEBHOOK_API --> PAYMENT
-
-  %% ===== Security =====
-  CLIENT --> JWT
-  JWT --> AUTH_API
-  JWT --> PLAN_API
-  JWT --> ORDER_API
-  JWT --> TRACK_API
-
-  %% ===== Service Collaboration =====
-  ORDERING --> ELIGIBILITY
-  ORDERING --> PAYMENT
-  TRACKING --> ORDERING
-  PAYMENT --> ORDERING
-
-  %% ===== Persistence =====
-  IDENTITY --> USERS
-  IDENTITY --> OTP
-
-  ELIGIBILITY --> CENTERS
-  ELIGIBILITY --> FLEET
-
-  ORDERING --> ORDERS
-  ORDERING --> PARCELS
-
-  PAYMENT --> PAYMENTS
-  PAYMENT --> ORDERS
-
-  TRACKING --> ORDERS
-
-  %% ===== External Integrations =====
-  ELIGIBILITY --> MAP
-  PAYMENT --> STRIPE
-
-  %% ===== Config / Seed =====
-  CONFIG --> JWT
-  SEED --> CENTERS
-  SEED --> FLEET
-```
 **MVP 图说明（持久化）**：仅 **PostgreSQL**；服务区域与距离可在库侧用 **PostGIS** 扩展，或由 **PlanningService** 用经纬度规则实现（与团队决议一致）。**不画** `PlanRepository` / `RouteRepository` / `RouteStopRepository` 时，表示 MVP 阶段路线与方案多在服务内计算并写入 **Order** 字段；若后续与 §2 全量对齐再落独立表。
 
 **非 MVP（回到 §2 全量图再引入）**：`PaymentController` 独立拆分、`AdminController`、`NotificationService`、**Redis**、**S3/MinIO**、**Weather**、**Push**、**PromoCodeRepository**、常用地址表（US-2.3，P1）等。
@@ -697,6 +600,105 @@ erDiagram
   Order ||--o{ SupportTicket : escalates
   PromoCode ||--o{ OrderPromoApplication : usedBy
   Order ||--o{ OrderPromoApplication : applies
+```
+```mermaid
+```mermaid
+flowchart TB
+  %% ===== Clients =====
+  CLIENT[Web / Mobile Client]
+
+  %% ===== API Layer =====
+  subgraph API[MVP API Layer]
+    AUTH_API[Auth API]
+    PLAN_API[Planning API]
+    ORDER_API[Order API]
+    TRACK_API[Tracking API]
+    WEBHOOK_API[Stripe Webhook API]
+  end
+
+  %% ===== Core Services =====
+  subgraph CORE[MVP Core Services]
+    IDENTITY[Identity Service]
+    ELIGIBILITY[Eligibility & Pricing Service]
+    ORDERING[Order Management Service]
+    TRACKING[Tracking Service]
+    PAYMENT[Payment Orchestration Service]
+  end
+
+  %% ===== Domain Data =====
+  subgraph DATA[MVP Data Storage]
+    USERS[(Users)]
+    OTP[(OTP Challenges)]
+    CENTERS[(Delivery Centers)]
+    FLEET[(Fleet Inventory)]
+    ORDERS[(Orders)]
+    PARCELS[(Order Parcels)]
+    PAYMENTS[(Payments)]
+  end
+
+  %% ===== External Dependencies =====
+  subgraph EXT[External Services]
+    MAP[Map / Geocoding API]
+    STRIPE[Stripe API]
+  end
+
+  %% ===== Platform / Security =====
+  subgraph PLATFORM[Security & Runtime]
+    JWT[JWT Auth / Security Filter]
+    CONFIG[App Config]
+    SEED[Dev Seed Data]
+  end
+
+  %% ===== Client Entry =====
+  CLIENT --> AUTH_API
+  CLIENT --> PLAN_API
+  CLIENT --> ORDER_API
+  CLIENT --> TRACK_API
+
+  %% ===== API to Services =====
+  AUTH_API --> IDENTITY
+  PLAN_API --> ELIGIBILITY
+  ORDER_API --> ORDERING
+  ORDER_API --> PAYMENT
+  TRACK_API --> TRACKING
+  WEBHOOK_API --> PAYMENT
+
+  %% ===== Security =====
+  CLIENT --> JWT
+  JWT --> AUTH_API
+  JWT --> PLAN_API
+  JWT --> ORDER_API
+  JWT --> TRACK_API
+
+  %% ===== Service Collaboration =====
+  ORDERING --> ELIGIBILITY
+  ORDERING --> PAYMENT
+  TRACKING --> ORDERING
+  PAYMENT --> ORDERING
+
+  %% ===== Persistence =====
+  IDENTITY --> USERS
+  IDENTITY --> OTP
+
+  ELIGIBILITY --> CENTERS
+  ELIGIBILITY --> FLEET
+
+  ORDERING --> ORDERS
+  ORDERING --> PARCELS
+
+  PAYMENT --> PAYMENTS
+  PAYMENT --> ORDERS
+
+  TRACKING --> ORDERS
+
+  %% ===== External Integrations =====
+  ELIGIBILITY --> MAP
+  PAYMENT --> STRIPE
+
+  %% ===== Config / Seed =====
+  CONFIG --> JWT
+  SEED --> CENTERS
+  SEED --> FLEET
 ```
 
 ### 4.1 实体字段概要（实现对照）
