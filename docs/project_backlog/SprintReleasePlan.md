@@ -2,7 +2,7 @@
 
 ## 1. 团队产能分析
 
-| 名字          | 角色      | Github  (in style`@[username](link)`                 |
+| 名字          | 角色      | Github  (in style `@[username](link)` )                 |
 | ------------- | --------- | ---------------------------------------------------- |
 | @Hao Chen     | 组长      | @[JarrettChen217](https://github.com/JarrettChen217) |
 | @Qiyuan Huang | 后端 Lead | @[qhuang258](https://github.com/qhuang258)           |
