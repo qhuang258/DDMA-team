@@ -279,3 +279,6 @@ flowchart LR
 | [ProductBacklog.md](../project_backlog/ProductBacklog.md)                   | 用户故事与优先级                    | @Hao Chen, @Qiyuan Huang, @Yuyang Zhou |
 | [JavaBackendArchitecture.md](../project_backlog/JavaBackendArchitecture.md) | ER 与后端分层                       | @Qiyuan Huang, @Hao Chen               |
 | [UIBacklog.md](../project_backlog/UIBacklog.md)                             | UI 需求参考（本冲刺不做高保真落地） | @Yuyang Zhou                           |
+| [OpenApiBaseline.md](./OpenApiBaseline.md)                                  | Sprint 1 OpenAPI baseline 说明与访问入口 | @Qiyuan Huang                      |
+| [AuthBackendHandOff.md](./AuthBackendHandOff.md)                            | Sprint 1 后端已完成部分、seed 数据与队友接手说明 | @Qiyuan Huang                |
+| [sprint1-baseline.yaml](../../backend/DeliveryManagement/src/main/resources/static/openapi/sprint1-baseline.yaml) | Sprint 1 固定契约源码文件 | @Qiyuan Huang |
