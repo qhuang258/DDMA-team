@@ -1,5 +1,8 @@
 package com.laioffer.deliverymanagement.auth;
 
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
+import com.laioffer.deliverymanagement.api.ApiException;
 import com.laioffer.deliverymanagement.dto.AppUserDto;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -7,23 +10,28 @@ import org.springframework.stereotype.Component;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @Component
 public class JwtService {
 
     private final byte[] secret;
     private final long expirationSeconds;
+    private final ObjectMapper objectMapper;
 
     public JwtService(
             @Value("${app.auth.jwt-secret}") String secret,
-            @Value("${app.auth.jwt-expiration-seconds}") long expirationSeconds
+            @Value("${app.auth.jwt-expiration-seconds}") long expirationSeconds,
+            ObjectMapper objectMapper
     ) {
         this.secret = secret.getBytes(StandardCharsets.UTF_8);
         this.expirationSeconds = expirationSeconds;
+        this.objectMapper = objectMapper;
     }
 
     public String issueToken(AppUserDto user) {
@@ -41,6 +49,41 @@ public class JwtService {
 
         String signingInput = header + "." + payload;
         return signingInput + "." + sign(signingInput);
+    }
+
+    public AuthenticatedUser verifyToken(String token) {
+        String[] parts = token.split("\\.");
+        if (parts.length != 3) {
+            throw new ApiException(401, "TOKEN_INVALID", "Invalid token.");
+        }
+
+        String signingInput = parts[0] + "." + parts[1];
+        byte[] expected = sign(signingInput).getBytes(StandardCharsets.UTF_8);
+        byte[] actual = parts[2].getBytes(StandardCharsets.UTF_8);
+        if (!MessageDigest.isEqual(expected, actual)) {
+            throw new ApiException(401, "TOKEN_INVALID", "Invalid token.");
+        }
+
+        try {
+            byte[] payloadBytes = Base64.getUrlDecoder().decode(parts[1]);
+            Map<String, Object> claims = objectMapper.readValue(payloadBytes, new TypeReference<>() {});
+
+            long exp = ((Number) claims.get("exp")).longValue();
+            if (Instant.now().getEpochSecond() > exp) {
+                throw new ApiException(401, "TOKEN_EXPIRED", "Token has expired.");
+            }
+
+            return new AuthenticatedUser(
+                    UUID.fromString((String) claims.get("sub")),
+                    (String) claims.get("email"),
+                    (String) claims.get("phone"),
+                    (Boolean) claims.get("guest")
+            );
+        } catch (ApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ApiException(401, "TOKEN_INVALID", "Invalid token.");
+        }
     }
 
     public long expirationSeconds() {
