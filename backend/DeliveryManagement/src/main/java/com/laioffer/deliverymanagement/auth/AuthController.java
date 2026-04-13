@@ -4,9 +4,9 @@ import com.laioffer.deliverymanagement.api.ApiException;
 import com.laioffer.deliverymanagement.service.AppUserService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -42,7 +42,7 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public AppUserSummary me(@AuthenticationPrincipal AuthenticatedUser user) {
+    public AppUserSummary me(@RequestAttribute(JwtAuthInterceptor.ATTR) AuthenticatedUser user) {
         return appUserService.findById(user.id())
                 .map(u -> new AppUserSummary(u.id(), u.email(), u.phone(), u.fullName(), u.guest()))
                 .orElseThrow(() -> new ApiException(401, "USER_NOT_FOUND", "Authenticated user no longer exists."));
