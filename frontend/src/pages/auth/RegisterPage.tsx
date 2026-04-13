@@ -1,4 +1,4 @@
-import { Button, Card, Form, Input, Steps, Typography, message } from "antd";
+import { Button, Card, Form, Input, Steps, Typography, message, notification } from "antd";
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { register, sendOtp } from "../../api/client";
@@ -20,6 +20,7 @@ export function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [stepOneData, setStepOneData] = useState<StepOneValues | null>(null);
   const [messageApi, contextHolder] = message.useMessage();
+  const [notificationApi, notificationHolder] = notification.useNotification();
 
   const handleSendOtp = async (values: StepOneValues) => {
     try {
@@ -29,19 +30,38 @@ export function RegisterPage() {
         full_name: values.name,
         email: values.identifier,
         password: values.password,
-        channel: "EMAIL",
       });
 
       if (!res?.challenge_id) {
         throw new Error(
-          "sendOtp 接口没有返回 challenge_id。请检查后端是否已重启，或 client.ts 是否仍在使用 mock 返回。\n",
+          "sendOtp 接口没有返回 challenge_id。请检查后端是否已重启。",
         );
       }
 
       setChallengeId(String(res.challenge_id));
       setStepOneData(values);
       setStep(1);
-      messageApi.success("验证码已发送，请查看后端 terminal 中打印的 OTP。");
+
+      notificationApi.open({
+        type: "warning",
+        message: "开发模式 — OTP 验证码",
+        description: (
+          <span>
+            您的验证码为：
+            <strong style={{ fontSize: 22, letterSpacing: 6, display: "inline-block", margin: "4px 0" }}>
+              {res.otp_code}
+            </strong>
+            <br />
+            <span style={{ color: "#888", fontSize: 12 }}>
+              （此弹窗仅在开发阶段出现，生产环境将发送至邮箱/手机）
+            </span>
+          </span>
+        ),
+        placement: "top",
+        duration: 30,
+      });
+
+      messageApi.success("验证码已生成，请查看页面顶部弹窗。");
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "发送验证码失败";
@@ -94,6 +114,7 @@ export function RegisterPage() {
       }}
     >
       {contextHolder}
+      {notificationHolder}
       <Card style={{ width: 440 }} title="注册">
         <Steps
           size="small"

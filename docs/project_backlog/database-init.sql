@@ -132,7 +132,8 @@ CREATE TABLE orders (
         REFERENCES fleet_vehicle (id) ON DELETE SET NULL,
     CONSTRAINT chk_orders_vehicle_type_chosen CHECK (
         vehicle_type_chosen IS NULL OR vehicle_type_chosen IN ('DRONE', 'ROBOT')
-    )
+    ),
+    CONSTRAINT chk_orders_status CHECK (status IN ('PENDING','IN_TRANSIT','DELIVERED','CANCELLED'))
 );
 
 CREATE INDEX idx_orders_user_id ON orders (user_id);
@@ -172,6 +173,7 @@ CREATE TABLE payment (
     amount                   NUMERIC(12, 2) NOT NULL,
     currency                 VARCHAR(10)    NOT NULL DEFAULT 'USD',
     idempotency_key          VARCHAR(255),
+    created_at               TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
     updated_at               TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
     provider_payload         JSONB,
 
@@ -179,7 +181,8 @@ CREATE TABLE payment (
     CONSTRAINT uq_payment_order UNIQUE (order_id),
     CONSTRAINT uq_payment_idempotency_key UNIQUE (idempotency_key),
     CONSTRAINT fk_payment_order FOREIGN KEY (order_id)
-        REFERENCES orders (id) ON DELETE RESTRICT
+        REFERENCES orders (id) ON DELETE RESTRICT,
+    CONSTRAINT chk_payment_status CHECK (status IN ('PENDING','SUCCEEDED','FAILED','REFUNDED'))
 );
 
 CREATE INDEX idx_payment_stripe_intent ON payment (stripe_payment_intent_id);

@@ -1,11 +1,13 @@
 package com.laioffer.deliverymanagement.service;
 
 import com.laioffer.deliverymanagement.dto.AppUserDto;
-import com.laioffer.deliverymanagement.service.support.DtoRowMappers;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import com.laioffer.deliverymanagement.entity.AppUserEntity;
+import com.laioffer.deliverymanagement.entity.Jsonb;
+import com.laioffer.deliverymanagement.repository.AppUserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,50 +15,30 @@ import java.util.UUID;
 @Service
 public class AppUserService {
 
-    private static final String SELECT_SQL = """
-            SELECT id, email, phone, password_hash, full_name, guest,
-                   created_at, updated_at, version, metadata
-            FROM app_user
-            """;
+    private final AppUserRepository repository;
 
-    private final JdbcClient jdbcClient;
-
-    public AppUserService(JdbcClient jdbcClient) {
-        this.jdbcClient = jdbcClient;
+    public AppUserService(AppUserRepository repository) {
+        this.repository = repository;
     }
 
     public List<AppUserDto> findAll() {
-        return jdbcClient.sql(SELECT_SQL + " ORDER BY created_at, id")
-                .query(DtoRowMappers::mapAppUser)
-                .list();
+        return repository.findAll().stream().map(AppUserService::toDto).toList();
     }
 
     public Optional<AppUserDto> findById(UUID id) {
-        return jdbcClient.sql(SELECT_SQL + " WHERE id = :id")
-                .param("id", id)
-                .query(DtoRowMappers::mapAppUser)
-                .optional();
+        return repository.findById(id).map(AppUserService::toDto);
     }
 
     public Optional<AppUserDto> findByEmail(String email) {
-        return jdbcClient.sql(SELECT_SQL + " WHERE email = :email")
-                .param("email", email)
-                .query(DtoRowMappers::mapAppUser)
-                .optional();
+        return repository.findByEmail(email).map(AppUserService::toDto);
     }
 
     public Optional<AppUserDto> findByPhone(String phone) {
-        return jdbcClient.sql(SELECT_SQL + " WHERE phone = :phone")
-                .param("phone", phone)
-                .query(DtoRowMappers::mapAppUser)
-                .optional();
+        return repository.findByPhone(phone).map(AppUserService::toDto);
     }
 
     public Optional<AppUserDto> findByEmailOrPhone(String identifier) {
-        return jdbcClient.sql(SELECT_SQL + " WHERE email = :identifier OR phone = :identifier ORDER BY created_at, id LIMIT 1")
-                .param("identifier", identifier)
-                .query(DtoRowMappers::mapAppUser)
-                .optional();
+        return repository.findByEmailOrPhone(identifier).map(AppUserService::toDto);
     }
 
     @Transactional
@@ -68,44 +50,36 @@ public class AppUserService {
             boolean guest,
             String metadata
     ) {
-        return jdbcClient.sql("""
-                        INSERT INTO app_user (email, phone, password_hash, full_name, guest, metadata)
-                        VALUES (:email, :phone, :passwordHash, :fullName, :guest, CAST(:metadata AS jsonb))
-                        RETURNING id, email, phone, password_hash, full_name, guest,
-                                  created_at, updated_at, version, metadata
-                        """)
-                .param("email", email)
-                .param("phone", phone)
-                .param("passwordHash", passwordHash)
-                .param("fullName", fullName)
-                .param("guest", guest)
-                .param("metadata", metadata)
-                .query(DtoRowMappers::mapAppUser)
-                .single();
+        OffsetDateTime now = OffsetDateTime.now();
+        AppUserEntity saved = repository.save(
+                new AppUserEntity(null, email, phone, passwordHash, fullName,
+                        guest, now, now, 0, Jsonb.of(metadata))
+        );
+        return toDto(saved);
     }
 
     @Transactional
     public Optional<AppUserDto> activateUser(UUID id) {
-        return jdbcClient.sql("""
-                        UPDATE app_user
-                        SET guest = FALSE,
-                            updated_at = CURRENT_TIMESTAMP,
-                            version = version + 1
-                        WHERE id = :id
-                        RETURNING id, email, phone, password_hash, full_name, guest,
-                                  created_at, updated_at, version, metadata
-                        """)
-                .param("id", id)
-                .query(DtoRowMappers::mapAppUser)
-                .optional();
+        repository.activateUser(id);
+        return repository.findById(id).map(AppUserService::toDto);
     }
 
     public long count() {
-        return requiredCount("SELECT COUNT(*) FROM app_user");
+        return repository.count();
     }
 
-    private long requiredCount(String sql) {
-        Long count = jdbcClient.sql(sql).query(Long.class).single();
-        return count == null ? 0L : count;
+    private static AppUserDto toDto(AppUserEntity e) {
+        return new AppUserDto(
+                e.id(),
+                e.email(),
+                e.phone(),
+                e.passwordHash(),
+                e.fullName(),
+                e.guest(),
+                e.createdAt(),
+                e.updatedAt(),
+                e.version(),
+                e.metadata() == null ? null : e.metadata().value()
+        );
     }
 }

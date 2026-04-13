@@ -24,13 +24,11 @@ export interface SendOtpRequest {
   email?: string;
   phone?: string;
   password: string;
-  channel: "EMAIL" | "SMS";
 }
 
 export interface SendOtpResponse {
   challenge_id: string;
-  channel: "EMAIL" | "SMS";
-  expires_at: string;
+  otp_code: string;
   message: string;
 }
 
@@ -138,7 +136,7 @@ async function request<T>(
 // ================== AUTH ==================
 
 export function sendOtp(body: SendOtpRequest): Promise<SendOtpResponse> {
-  return request<SendOtpResponse>("/api/v1/auth/register/otp", {
+  return request<SendOtpResponse>("/api/v1/auth/register", {
     method: "POST",
     body: JSON.stringify(body),
   });

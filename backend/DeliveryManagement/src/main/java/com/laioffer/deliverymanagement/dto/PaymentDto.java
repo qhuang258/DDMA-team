@@ -12,6 +12,7 @@ public record PaymentDto(
         BigDecimal amount,
         String currency,
         String idempotencyKey,
+        OffsetDateTime createdAt,
         OffsetDateTime updatedAt,
         String providerPayload
 ) {

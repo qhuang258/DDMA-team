@@ -1,8 +1,8 @@
 package com.laioffer.deliverymanagement.service;
 
 import com.laioffer.deliverymanagement.dto.OtpChallengeDto;
-import com.laioffer.deliverymanagement.service.support.DtoRowMappers;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import com.laioffer.deliverymanagement.entity.OtpChallengeEntity;
+import com.laioffer.deliverymanagement.repository.OtpChallengeRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,105 +14,65 @@ import java.util.UUID;
 @Service
 public class OtpChallengeService {
 
-    private static final String SELECT_SQL = """
-            SELECT id, user_id, channel, code_hash, expires_at, consumed,
-                   attempt_count, created_at
-            FROM otp_challenge
-            """;
+    private final OtpChallengeRepository repository;
 
-    private final JdbcClient jdbcClient;
-
-    public OtpChallengeService(JdbcClient jdbcClient) {
-        this.jdbcClient = jdbcClient;
+    public OtpChallengeService(OtpChallengeRepository repository) {
+        this.repository = repository;
     }
 
     public List<OtpChallengeDto> findAll() {
-        return jdbcClient.sql(SELECT_SQL + " ORDER BY created_at, id")
-                .query(DtoRowMappers::mapOtpChallenge)
-                .list();
+        return repository.findAll().stream().map(OtpChallengeService::toDto).toList();
     }
 
     public List<OtpChallengeDto> findByUserId(UUID userId) {
-        return jdbcClient.sql(SELECT_SQL + " WHERE user_id = :userId ORDER BY created_at, id")
-                .param("userId", userId)
-                .query(DtoRowMappers::mapOtpChallenge)
-                .list();
+        return repository.findByUserId(userId).stream().map(OtpChallengeService::toDto).toList();
     }
 
     public Optional<OtpChallengeDto> findById(UUID id) {
-        return jdbcClient.sql(SELECT_SQL + " WHERE id = :id")
-                .param("id", id)
-                .query(DtoRowMappers::mapOtpChallenge)
-                .optional();
+        return repository.findById(id).map(OtpChallengeService::toDto);
     }
 
     public Optional<OtpChallengeDto> findLatestByUserId(UUID userId) {
-        return jdbcClient.sql(SELECT_SQL + " WHERE user_id = :userId ORDER BY created_at DESC, id DESC LIMIT 1")
-                .param("userId", userId)
-                .query(DtoRowMappers::mapOtpChallenge)
-                .optional();
+        return repository.findLatestByUserId(userId).map(OtpChallengeService::toDto);
     }
 
     public Optional<OtpChallengeDto> findLatestActiveByUserId(UUID userId) {
-        return jdbcClient.sql(SELECT_SQL + """
-                         WHERE user_id = :userId
-                           AND consumed = FALSE
-                           AND expires_at > CURRENT_TIMESTAMP
-                         ORDER BY created_at DESC, id DESC
-                         LIMIT 1
-                        """)
-                .param("userId", userId)
-                .query(DtoRowMappers::mapOtpChallenge)
-                .optional();
+        return repository.findLatestActiveByUserId(userId).map(OtpChallengeService::toDto);
     }
 
     @Transactional
     public OtpChallengeDto createChallenge(UUID userId, String channel, String codeHash, OffsetDateTime expiresAt) {
-        return jdbcClient.sql("""
-                        INSERT INTO otp_challenge (user_id, channel, code_hash, expires_at)
-                        VALUES (:userId, :channel, :codeHash, :expiresAt)
-                        RETURNING id, user_id, channel, code_hash, expires_at, consumed,
-                                  attempt_count, created_at
-                        """)
-                .param("userId", userId)
-                .param("channel", channel)
-                .param("codeHash", codeHash)
-                .param("expiresAt", expiresAt)
-                .query(DtoRowMappers::mapOtpChallenge)
-                .single();
+        OtpChallengeEntity saved = repository.save(
+                new OtpChallengeEntity(null, userId, channel, codeHash, expiresAt, false, (short) 0, OffsetDateTime.now())
+        );
+        return toDto(saved);
     }
 
     @Transactional
     public Optional<OtpChallengeDto> incrementAttemptCount(UUID id) {
-        return jdbcClient.sql("""
-                        UPDATE otp_challenge
-                        SET attempt_count = attempt_count + 1
-                        WHERE id = :id
-                        RETURNING id, user_id, channel, code_hash, expires_at, consumed,
-                                  attempt_count, created_at
-                        """)
-                .param("id", id)
-                .query(DtoRowMappers::mapOtpChallenge)
-                .optional();
+        repository.incrementAttemptCount(id);
+        return repository.findById(id).map(OtpChallengeService::toDto);
     }
 
     @Transactional
     public boolean markConsumed(UUID id) {
-        return jdbcClient.sql("""
-                        UPDATE otp_challenge
-                        SET consumed = TRUE
-                        WHERE id = :id AND consumed = FALSE
-                        """)
-                .param("id", id)
-                .update() > 0;
+        return repository.markConsumed(id) > 0;
     }
 
     public long count() {
-        return requiredCount("SELECT COUNT(*) FROM otp_challenge");
+        return repository.count();
     }
 
-    private long requiredCount(String sql) {
-        Long count = jdbcClient.sql(sql).query(Long.class).single();
-        return count == null ? 0L : count;
+    private static OtpChallengeDto toDto(OtpChallengeEntity e) {
+        return new OtpChallengeDto(
+                e.id(),
+                e.userId(),
+                e.channel(),
+                e.codeHash(),
+                e.expiresAt(),
+                e.consumed(),
+                e.attemptCount(),
+                e.createdAt()
+        );
     }
 }

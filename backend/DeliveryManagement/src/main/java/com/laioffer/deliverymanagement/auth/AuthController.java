@@ -24,6 +24,12 @@ public class AuthController {
         this.appUserService = appUserService;
     }
 
+    @PostMapping("/register")
+    @ResponseStatus(HttpStatus.CREATED)
+    public InitiateRegistrationResponse initiateRegistration(@Valid @RequestBody RegisterRequest request) {
+        return authService.initiateRegistration(request);
+    }
+
     @PostMapping("/register/complete")
     @ResponseStatus(HttpStatus.CREATED)
     public RegistrationResponse completeRegistration(@Valid @RequestBody CompleteRegistrationRequest request) {

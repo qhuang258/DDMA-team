@@ -1,8 +1,8 @@
 package com.laioffer.deliverymanagement.service;
 
 import com.laioffer.deliverymanagement.dto.DeliveryCenterDto;
-import com.laioffer.deliverymanagement.service.support.DtoRowMappers;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import com.laioffer.deliverymanagement.entity.DeliveryCenterEntity;
+import com.laioffer.deliverymanagement.repository.DeliveryCenterRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -12,37 +12,33 @@ import java.util.UUID;
 @Service
 public class DeliveryCenterService {
 
-    private static final String SELECT_SQL = """
-            SELECT id, name, latitude, longitude, address_line,
-                   service_area_geo, metadata
-            FROM delivery_center
-            """;
+    private final DeliveryCenterRepository repository;
 
-    private final JdbcClient jdbcClient;
-
-    public DeliveryCenterService(JdbcClient jdbcClient) {
-        this.jdbcClient = jdbcClient;
+    public DeliveryCenterService(DeliveryCenterRepository repository) {
+        this.repository = repository;
     }
 
     public List<DeliveryCenterDto> findAll() {
-        return jdbcClient.sql(SELECT_SQL + " ORDER BY name, id")
-                .query(DtoRowMappers::mapDeliveryCenter)
-                .list();
+        return repository.findAll().stream().map(DeliveryCenterService::toDto).toList();
     }
 
     public Optional<DeliveryCenterDto> findById(UUID id) {
-        return jdbcClient.sql(SELECT_SQL + " WHERE id = :id")
-                .param("id", id)
-                .query(DtoRowMappers::mapDeliveryCenter)
-                .optional();
+        return repository.findById(id).map(DeliveryCenterService::toDto);
     }
 
     public long count() {
-        return requiredCount("SELECT COUNT(*) FROM delivery_center");
+        return repository.count();
     }
 
-    private long requiredCount(String sql) {
-        Long count = jdbcClient.sql(sql).query(Long.class).single();
-        return count == null ? 0L : count;
+    private static DeliveryCenterDto toDto(DeliveryCenterEntity e) {
+        return new DeliveryCenterDto(
+                e.id(),
+                e.name(),
+                e.latitude(),
+                e.longitude(),
+                e.addressLine(),
+                e.serviceAreaGeo() == null ? null : e.serviceAreaGeo().value(),
+                e.metadata() == null ? null : e.metadata().value()
+        );
     }
 }

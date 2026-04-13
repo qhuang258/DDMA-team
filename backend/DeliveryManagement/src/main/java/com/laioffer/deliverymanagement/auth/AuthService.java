@@ -8,6 +8,9 @@ import com.laioffer.deliverymanagement.service.OtpChallengeService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
+import java.time.OffsetDateTime;
+
 @Service
 public class AuthService {
 
@@ -26,6 +29,52 @@ public class AuthService {
         this.otpChallengeService = otpChallengeService;
         this.passwordHashService = passwordHashService;
         this.jwtService = jwtService;
+    }
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
+    @Transactional
+    public InitiateRegistrationResponse initiateRegistration(RegisterRequest request) {
+        if (request.email() == null && request.phone() == null) {
+            throw new ApiException(400, "EMAIL_OR_PHONE_REQUIRED", "At least one of email or phone must be provided.");
+        }
+        if (request.email() != null) {
+            appUserService.findByEmail(request.email())
+                    .filter(u -> !u.guest())
+                    .ifPresent(u -> { throw new ApiException(409, "EMAIL_TAKEN", "Email is already registered."); });
+        }
+        if (request.phone() != null) {
+            appUserService.findByPhone(request.phone())
+                    .filter(u -> !u.guest())
+                    .ifPresent(u -> { throw new ApiException(409, "PHONE_TAKEN", "Phone is already registered."); });
+        }
+
+        String otpCode = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+        String passwordHash = passwordHashService.hash(request.password());
+        String codeHash = passwordHashService.hash(otpCode);
+        String channel = request.email() != null ? "EMAIL" : "SMS";
+
+        AppUserDto pendingUser = appUserService.createUser(
+                request.email(),
+                request.phone(),
+                passwordHash,
+                request.fullName(),
+                true,
+                null
+        );
+
+        OtpChallengeDto challenge = otpChallengeService.createChallenge(
+                pendingUser.id(),
+                channel,
+                codeHash,
+                OffsetDateTime.now().plusMinutes(15)
+        );
+
+        return new InitiateRegistrationResponse(
+                challenge.id(),
+                otpCode,
+                "OTP challenge created. Use the otp_code to complete registration."
+        );
     }
 
     @Transactional

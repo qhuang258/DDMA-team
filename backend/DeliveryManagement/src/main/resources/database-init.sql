@@ -172,6 +172,7 @@ CREATE TABLE payment (
                          amount                   NUMERIC(12, 2) NOT NULL,
                          currency                 VARCHAR(10)    NOT NULL DEFAULT 'USD',
                          idempotency_key          VARCHAR(255),
+                         created_at               TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
                          updated_at               TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
                          provider_payload         JSONB,
 

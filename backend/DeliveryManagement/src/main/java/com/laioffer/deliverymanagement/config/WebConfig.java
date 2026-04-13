@@ -1,26 +1,4 @@
 package com.laioffer.deliverymanagement.config;
 
-import com.laioffer.deliverymanagement.auth.JwtAuthInterceptor;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
-
-@Configuration
-public class WebConfig implements WebMvcConfigurer {
-
-    private final JwtAuthInterceptor jwtAuthInterceptor;
-
-    public WebConfig(JwtAuthInterceptor jwtAuthInterceptor) {
-        this.jwtAuthInterceptor = jwtAuthInterceptor;
-    }
-
-    @Override
-    public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(jwtAuthInterceptor)
-                .addPathPatterns(
-                        "/api/v1/auth/me",
-                        "/api/v1/centers/**",
-                        "/api/v1/vehicles/**"
-                );
-    }
-}
+// Route protection has been moved to SecurityConfig (Spring Security).
+// This file is intentionally empty.

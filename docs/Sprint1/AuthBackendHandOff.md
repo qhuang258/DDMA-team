@@ -6,8 +6,10 @@ This note is for teammates continuing Sprint 1 backend/frontend work after `T-1.
 
 - `T-1.11`: auth-related DTO/service read-write paths are available
 - `T-1.12`: OpenAPI baseline is frozen
+- `T-1.13a`: `POST /api/v1/auth/register` (initiate — create pending user + OTP challenge)
 - `T-1.13b`: `POST /api/v1/auth/register/complete`
 - `T-1.14a`: `POST /api/v1/auth/login`
+- `T-1.14b`: JWT verification + protected routes via `JwtAuthInterceptor`
 
 ## Fixed contract entry
 
@@ -34,6 +36,34 @@ $env:DATABASE_PASSWORD='Simao@618255'
 
 ## Current working endpoints
 
+### Initiate registration
+
+- Method: `POST`
+- Path: `/api/v1/auth/register`
+- Request:
+
+```json
+{
+  "email": "newuser@example.com",
+  "phone": null,
+  "password": "Test1234!",
+  "full_name": "New User"
+}
+```
+
+- Response (`201`):
+
+```json
+{
+  "challenge_id": "<uuid>",
+  "otp_code": "381924",
+  "message": "OTP challenge created. Use the otp_code to complete registration."
+}
+```
+
+> `email` and `phone` are both optional, but at least one must be provided.
+> `otp_code` is returned in plaintext for dev/testing — production would send via email/SMS.
+
 ### Complete registration
 
 - Method: `POST`
@@ -42,8 +72,8 @@ $env:DATABASE_PASSWORD='Simao@618255'
 
 ```json
 {
-  "challenge_id": "b0000002-0000-0000-0000-000000000004",
-  "otp_code": "654321"
+  "challenge_id": "<uuid from initiate>",
+  "otp_code": "<otp_code from initiate>"
 }
 ```
 
@@ -60,6 +90,12 @@ $env:DATABASE_PASSWORD='Simao@618255'
 }
 ```
 
+### Get current user (protected)
+
+- Method: `GET`
+- Path: `/api/v1/auth/me`
+- Header: `Authorization: Bearer <token>`
+
 ## Dev seed data for verification
 
 - Login user:
@@ -70,30 +106,13 @@ $env:DATABASE_PASSWORD='Simao@618255'
   - `challenge_id = b0000002-0000-0000-0000-000000000004`
   - `otp_code = 654321`
 
-## What Yanjia needs for `T-1.13a`
+## Protected routes (require `Authorization: Bearer <token>`)
 
-- Implement `POST /api/v1/auth/register/otp`
-- Reuse:
-  - `AppUserService.createUser(...)`
-  - `OtpChallengeService.createChallenge(...)`
-  - `PasswordHashService.hash(...)`
-- Expected flow:
-  - check duplicate email / phone
-  - create pending user with `guest = true`
-  - hash OTP and store challenge
-  - return `challenge_id`, `channel`, `expires_at`
-
-## What Lei needs for `T-1.14b`
-
-- Add JWT verification and protected route behavior
-- Reuse:
-  - `JwtService` config values in `application.yml`
-- Protect at least:
-  - `GET /api/v1/auth/me`
-  - `GET /api/v1/centers`
-  - `GET /api/v1/centers/{centerId}`
-  - `GET /api/v1/centers/{centerId}/vehicles`
-  - `GET /api/v1/vehicles/{vehicleId}`
+- `GET /api/v1/auth/me`
+- `GET /api/v1/centers`
+- `GET /api/v1/centers/{centerId}`
+- `GET /api/v1/centers/{centerId}/vehicles`
+- `GET /api/v1/vehicles/{vehicleId}`
 
 ## What frontend needs to know
 

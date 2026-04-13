@@ -8,7 +8,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 import tools.jackson.databind.ObjectMapper;
 
-@Component
+// Replaced by JwtAuthFilter (Spring Security OncePerRequestFilter).
+// @Component removed so Spring no longer picks this up.
 public class JwtAuthInterceptor implements HandlerInterceptor {
 
     static final String ATTR = "authenticatedUser";

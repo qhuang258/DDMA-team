@@ -147,6 +147,102 @@ FROM orders
 WHERE status = 'IN_TRANSIT';
 ```
 
+## Sprint 1 Auth API Verification
+
+Sprint 1 implements a full JWT-based auth flow. Start the app with the `dev` profile (see below), then use the following curl commands to verify end-to-end.
+
+### Prerequisites
+
+```bash
+# 1. Start PostgreSQL
+cd backend/DeliveryManagement
+docker compose up -d
+
+# 2. Start the backend (dev profile re-seeds the DB on every start)
+./gradlew bootRun --args="--spring.profiles.active=dev"
+```
+
+### Step 1 — Register (initiate)
+
+Creates a pending user and returns a one-time OTP code.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"newuser@example.com","password":"Test1234!","full_name":"New User"}'
+```
+
+Expected response (`201 Created`):
+
+```json
+{
+  "challenge_id": "<uuid>",
+  "otp_code": "381924",
+  "message": "OTP challenge created. Use the otp_code to complete registration."
+}
+```
+
+### Step 2 — Register (complete)
+
+Verifies the OTP and activates the account.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/register/complete \
+  -H "Content-Type: application/json" \
+  -d '{"challenge_id":"<uuid from step 1>","otp_code":"<otp_code from step 1>"}'
+```
+
+Expected response (`201 Created`):
+
+```json
+{
+  "user": { "id": "...", "email": "newuser@example.com", "guest": false },
+  "message": "Registration completed successfully."
+}
+```
+
+### Step 3 — Login
+
+```bash
+curl -X POST http://localhost:8080/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"identifier":"newuser@example.com","password":"Test1234!"}'
+```
+
+Expected response (`200 OK`):
+
+```json
+{
+  "access_token": "<jwt>",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "user": { ... }
+}
+```
+
+### Step 4 — Access a protected endpoint
+
+```bash
+curl http://localhost:8080/api/v1/centers \
+  -H "Authorization: Bearer <access_token from step 3>"
+```
+
+Expected: `200 OK` with a JSON array of delivery centers.
+
+### Dev seed accounts (already in DB)
+
+| Email | Password | Status |
+|---|---|---|
+| `alice@example.com` | `AlicePass123!` | active |
+| `bob@example.com` | `BobPass456!` | active |
+| `pending@example.com` | `PendingPass123!` | pending (use seed challenge below) |
+
+Seed OTP challenge for `pending@example.com`:
+- `challenge_id`: `b0000002-0000-0000-0000-000000000004`
+- `otp_code`: `654321`
+
+---
+
 ## Task 3 Verification
 
 Task 3 adds DTO classes, database-backed Service classes, and a `DevRunner` that verifies the `DTO + Service + database` chain in the `dev` profile.

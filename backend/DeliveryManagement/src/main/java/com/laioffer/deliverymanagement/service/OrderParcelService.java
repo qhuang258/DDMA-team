@@ -1,8 +1,8 @@
 package com.laioffer.deliverymanagement.service;
 
 import com.laioffer.deliverymanagement.dto.OrderParcelDto;
-import com.laioffer.deliverymanagement.service.support.DtoRowMappers;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import com.laioffer.deliverymanagement.entity.OrderParcelEntity;
+import com.laioffer.deliverymanagement.repository.OrderParcelRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -12,44 +12,38 @@ import java.util.UUID;
 @Service
 public class OrderParcelService {
 
-    private static final String SELECT_SQL = """
-            SELECT id, order_id, size_tier, weight_kg, fragile,
-                   delivery_notes, dimensions, metadata
-            FROM order_parcel
-            """;
+    private final OrderParcelRepository repository;
 
-    private final JdbcClient jdbcClient;
-
-    public OrderParcelService(JdbcClient jdbcClient) {
-        this.jdbcClient = jdbcClient;
+    public OrderParcelService(OrderParcelRepository repository) {
+        this.repository = repository;
     }
 
     public List<OrderParcelDto> findAll() {
-        return jdbcClient.sql(SELECT_SQL + " ORDER BY order_id, id")
-                .query(DtoRowMappers::mapOrderParcel)
-                .list();
+        return repository.findAll().stream().map(OrderParcelService::toDto).toList();
     }
 
     public Optional<OrderParcelDto> findByOrderId(UUID orderId) {
-        return jdbcClient.sql(SELECT_SQL + " WHERE order_id = :orderId")
-                .param("orderId", orderId)
-                .query(DtoRowMappers::mapOrderParcel)
-                .optional();
+        return repository.findByOrderId(orderId).map(OrderParcelService::toDto);
     }
 
     public Optional<OrderParcelDto> findById(UUID id) {
-        return jdbcClient.sql(SELECT_SQL + " WHERE id = :id")
-                .param("id", id)
-                .query(DtoRowMappers::mapOrderParcel)
-                .optional();
+        return repository.findById(id).map(OrderParcelService::toDto);
     }
 
     public long count() {
-        return requiredCount("SELECT COUNT(*) FROM order_parcel");
+        return repository.count();
     }
 
-    private long requiredCount(String sql) {
-        Long count = jdbcClient.sql(sql).query(Long.class).single();
-        return count == null ? 0L : count;
+    private static OrderParcelDto toDto(OrderParcelEntity e) {
+        return new OrderParcelDto(
+                e.id(),
+                e.orderId(),
+                e.sizeTier(),
+                e.weightKg(),
+                e.fragile(),
+                e.deliveryNotes(),
+                e.dimensions() == null ? null : e.dimensions().value(),
+                e.metadata() == null ? null : e.metadata().value()
+        );
     }
 }

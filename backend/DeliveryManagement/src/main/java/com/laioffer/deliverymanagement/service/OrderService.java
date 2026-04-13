@@ -1,8 +1,8 @@
 package com.laioffer.deliverymanagement.service;
 
 import com.laioffer.deliverymanagement.dto.OrderDto;
-import com.laioffer.deliverymanagement.service.support.DtoRowMappers;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import com.laioffer.deliverymanagement.entity.OrderEntity;
+import com.laioffer.deliverymanagement.repository.OrderRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -12,48 +12,52 @@ import java.util.UUID;
 @Service
 public class OrderService {
 
-    private static final String SELECT_SQL = """
-            SELECT id, user_id, center_id, fleet_vehicle_id, status,
-                   vehicle_type_chosen, pickup_summary, dropoff_summary,
-                   handoff_pin, estimated_minutes, total_amount, currency,
-                   sim_latitude, sim_longitude, sim_heading_deg, sim_updated_at,
-                   plan_snapshot, tracking_state, created_at, updated_at,
-                   version, metadata
-            FROM orders
-            """;
+    private final OrderRepository repository;
 
-    private final JdbcClient jdbcClient;
-
-    public OrderService(JdbcClient jdbcClient) {
-        this.jdbcClient = jdbcClient;
+    public OrderService(OrderRepository repository) {
+        this.repository = repository;
     }
 
     public List<OrderDto> findAll() {
-        return jdbcClient.sql(SELECT_SQL + " ORDER BY created_at, id")
-                .query(DtoRowMappers::mapOrder)
-                .list();
+        return repository.findAll().stream().map(OrderService::toDto).toList();
     }
 
     public List<OrderDto> findByUserId(UUID userId) {
-        return jdbcClient.sql(SELECT_SQL + " WHERE user_id = :userId ORDER BY created_at, id")
-                .param("userId", userId)
-                .query(DtoRowMappers::mapOrder)
-                .list();
+        return repository.findByUserId(userId).stream().map(OrderService::toDto).toList();
     }
 
     public Optional<OrderDto> findById(UUID id) {
-        return jdbcClient.sql(SELECT_SQL + " WHERE id = :id")
-                .param("id", id)
-                .query(DtoRowMappers::mapOrder)
-                .optional();
+        return repository.findById(id).map(OrderService::toDto);
     }
 
     public long count() {
-        return requiredCount("SELECT COUNT(*) FROM orders");
+        return repository.count();
     }
 
-    private long requiredCount(String sql) {
-        Long count = jdbcClient.sql(sql).query(Long.class).single();
-        return count == null ? 0L : count;
+    private static OrderDto toDto(OrderEntity e) {
+        return new OrderDto(
+                e.id(),
+                e.userId(),
+                e.centerId(),
+                e.fleetVehicleId(),
+                e.status(),
+                e.vehicleTypeChosen(),
+                e.pickupSummary(),
+                e.dropoffSummary(),
+                e.handoffPin(),
+                e.estimatedMinutes(),
+                e.totalAmount(),
+                e.currency(),
+                e.simLatitude(),
+                e.simLongitude(),
+                e.simHeadingDeg(),
+                e.simUpdatedAt(),
+                e.planSnapshot() == null ? null : e.planSnapshot().value(),
+                e.trackingState() == null ? null : e.trackingState().value(),
+                e.createdAt(),
+                e.updatedAt(),
+                e.version(),
+                e.metadata() == null ? null : e.metadata().value()
+        );
     }
 }

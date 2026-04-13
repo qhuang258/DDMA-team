@@ -1,8 +1,8 @@
 package com.laioffer.deliverymanagement.service;
 
 import com.laioffer.deliverymanagement.dto.FleetVehicleDto;
-import com.laioffer.deliverymanagement.service.support.DtoRowMappers;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import com.laioffer.deliverymanagement.entity.FleetVehicleEntity;
+import com.laioffer.deliverymanagement.repository.FleetVehicleRepository;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -12,44 +12,37 @@ import java.util.UUID;
 @Service
 public class FleetVehicleService {
 
-    private static final String SELECT_SQL = """
-            SELECT id, center_id, vehicle_type, available,
-                   external_device_id, telemetry_hint, metadata
-            FROM fleet_vehicle
-            """;
+    private final FleetVehicleRepository repository;
 
-    private final JdbcClient jdbcClient;
-
-    public FleetVehicleService(JdbcClient jdbcClient) {
-        this.jdbcClient = jdbcClient;
+    public FleetVehicleService(FleetVehicleRepository repository) {
+        this.repository = repository;
     }
 
     public List<FleetVehicleDto> findAll() {
-        return jdbcClient.sql(SELECT_SQL + " ORDER BY center_id, id")
-                .query(DtoRowMappers::mapFleetVehicle)
-                .list();
+        return repository.findAll().stream().map(FleetVehicleService::toDto).toList();
     }
 
     public List<FleetVehicleDto> findByCenterId(UUID centerId) {
-        return jdbcClient.sql(SELECT_SQL + " WHERE center_id = :centerId ORDER BY id")
-                .param("centerId", centerId)
-                .query(DtoRowMappers::mapFleetVehicle)
-                .list();
+        return repository.findByCenterId(centerId).stream().map(FleetVehicleService::toDto).toList();
     }
 
     public Optional<FleetVehicleDto> findById(UUID id) {
-        return jdbcClient.sql(SELECT_SQL + " WHERE id = :id")
-                .param("id", id)
-                .query(DtoRowMappers::mapFleetVehicle)
-                .optional();
+        return repository.findById(id).map(FleetVehicleService::toDto);
     }
 
     public long count() {
-        return requiredCount("SELECT COUNT(*) FROM fleet_vehicle");
+        return repository.count();
     }
 
-    private long requiredCount(String sql) {
-        Long count = jdbcClient.sql(sql).query(Long.class).single();
-        return count == null ? 0L : count;
+    private static FleetVehicleDto toDto(FleetVehicleEntity e) {
+        return new FleetVehicleDto(
+                e.id(),
+                e.centerId(),
+                e.vehicleType(),
+                e.available(),
+                e.externalDeviceId(),
+                e.telemetryHint() == null ? null : e.telemetryHint().value(),
+                e.metadata() == null ? null : e.metadata().value()
+        );
     }
 }
