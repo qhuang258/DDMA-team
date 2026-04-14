@@ -1,34 +1,32 @@
 import {
-  LaptopOutlined,
   LogoutOutlined,
   ShoppingOutlined,
   HistoryOutlined,
   EnvironmentOutlined,
-  CreditCardOutlined,
+  HomeOutlined,
   UserOutlined,
+  CarOutlined,
+  DownOutlined,
 } from '@ant-design/icons';
-import { Layout, Menu, Button, theme, Typography } from 'antd';
+import { Avatar, Dropdown, Layout, Menu, Typography } from 'antd';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 
-const { Header, Sider, Content } = Layout;
+const { Header, Content } = Layout;
 
-const menuItems = [
-  { key: '/', icon: <LaptopOutlined />, label: '首页' },
+const navItems = [
+  { key: '/', icon: <HomeOutlined />, label: '首页' },
   { key: '/order', icon: <ShoppingOutlined />, label: '创建订单' },
   { key: '/recommendations', icon: <EnvironmentOutlined />, label: '交付选项' },
-  { key: '/checkout', icon: <CreditCardOutlined />, label: '结账审查' },
   { key: '/history', icon: <HistoryOutlined />, label: '订单历史' },
-  { key: '/profile', icon: <UserOutlined />, label: '资料' },
 ];
 
 export function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
   const { logout } = useAuth();
-  const { token } = theme.useToken();
 
-  const selectedKey = menuItems.reduce((best, item) => {
+  const selectedKey = navItems.reduce((best, item) => {
     const exact = location.pathname === item.key;
     const nested = item.key !== '/' && location.pathname.startsWith(`${item.key}/`);
     if (exact || nested) {
@@ -42,48 +40,114 @@ export function AppShell() {
     navigate('/login', { replace: true });
   };
 
+  const userMenuItems = [
+    {
+      key: 'profile',
+      icon: <UserOutlined />,
+      label: '个人资料',
+      onClick: () => navigate('/profile'),
+    },
+    { type: 'divider' as const },
+    {
+      key: 'logout',
+      icon: <LogoutOutlined />,
+      label: '退出登录',
+      danger: true,
+      onClick: handleLogout,
+    },
+  ];
+
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Sider breakpoint="lg" collapsedWidth={0}>
+    <Layout style={{ minHeight: '100vh', background: '#F4F6FD' }}>
+      <Header
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 100,
+          background: '#fff',
+          borderBottom: '1px solid #E5EAFF',
+          padding: '0 32px',
+          height: 64,
+          display: 'flex',
+          alignItems: 'center',
+          boxShadow: '0 1px 0 0 #E5EAFF',
+        }}
+      >
+        {/* Logo */}
         <div
           style={{
-            height: 64,
-            margin: 16,
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
+            gap: 10,
+            cursor: 'pointer',
+            minWidth: 160,
+            flexShrink: 0,
           }}
+          onClick={() => navigate('/')}
         >
-          <Typography.Title level={4} style={{ color: token.colorWhite, margin: 0 }}>
+          <div
+            style={{
+              width: 34,
+              height: 34,
+              background: '#EEF2FF',
+              borderRadius: 9,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <CarOutlined style={{ fontSize: 18, color: '#4F6EF7' }} />
+          </div>
+          <Typography.Text strong style={{ fontSize: 15, color: '#1A1D2E', letterSpacing: -0.3 }}>
             自治配送
-          </Typography.Title>
+          </Typography.Text>
         </div>
+
+        {/* Nav */}
         <Menu
-          theme="dark"
-          mode="inline"
+          mode="horizontal"
           selectedKeys={[selectedKey]}
-          items={menuItems}
+          items={navItems}
           onClick={({ key }) => navigate(key)}
-        />
-      </Sider>
-      <Layout>
-        <Header
           style={{
-            padding: '0 24px',
-            background: token.colorBgContainer,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
+            flex: 1,
+            borderBottom: 'none',
+            justifyContent: 'center',
+            background: 'transparent',
           }}
-        >
-          <Button type="text" icon={<LogoutOutlined />} onClick={handleLogout}>
-            退出
-          </Button>
-        </Header>
-        <Content style={{ margin: 24 }}>
+        />
+
+        {/* User avatar dropdown */}
+        <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              cursor: 'pointer',
+              padding: '6px 10px',
+              borderRadius: 10,
+              transition: 'background 0.15s',
+              flexShrink: 0,
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLDivElement).style.background = '#F4F6FD';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLDivElement).style.background = 'transparent';
+            }}
+          >
+            <Avatar size={30} icon={<UserOutlined />} style={{ background: '#4F6EF7' }} />
+            <DownOutlined style={{ fontSize: 10, color: '#6B7280' }} />
+          </div>
+        </Dropdown>
+      </Header>
+
+      <Content>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px' }}>
           <Outlet />
-        </Content>
-      </Layout>
+        </div>
+      </Content>
     </Layout>
   );
 }

@@ -1,0 +1,31 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f4f6fd;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Remove Ant Design horizontal menu bottom border */
+.ant-menu-horizontal {
+  border-bottom: none !important;
+}
+
+/* Smooth page transitions */
+.ant-layout-content {
+  transition: opacity 0.15s ease;
+}
+
+/* Map vehicle pulse animation */
+@keyframes mapPulse {
+  0%   { transform: translate(-50%, -50%) scale(0.5); opacity: 0.8; }
+  100% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }
+}

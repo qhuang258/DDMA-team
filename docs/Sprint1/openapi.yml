@@ -1,0 +1,434 @@
+openapi: 3.0.3
+info:
+  title: Autonomous Delivery App — Sprint 1 API
+  version: 1.0.0
+  description: |
+    Sprint 1 auth + center + vehicle endpoints.
+    Import into Postman: File → Import → select this file.
+    Set the `baseUrl` variable to `http://localhost:8080` and
+    `token` variable to the JWT returned from POST /auth/login.
+
+servers:
+  - url: http://localhost:8080
+    description: Local dev
+
+tags:
+  - name: auth
+    description: Registration, OTP, login, current user
+  - name: centers
+    description: Delivery center read endpoints
+  - name: vehicles
+    description: Fleet vehicle read endpoints
+
+# ---------------------------------------------------------------------------
+# Reusable components
+# ---------------------------------------------------------------------------
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # --- Auth ---
+    RegisterRequest:
+      type: object
+      required: [password]
+      properties:
+        email:
+          type: string
+          example: "new_user@example.com"
+        phone:
+          type: string
+          example: "+14155550199"
+        password:
+          type: string
+          example: "MySecret123"
+        full_name:
+          type: string
+          example: "Jane Doe"
+
+    InitiateRegistrationResponse:
+      type: object
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+        otp_code:
+          type: string
+          description: "Plaintext OTP — dev mode only"
+          example: "381924"
+        message:
+          type: string
+
+    CompleteRegistrationRequest:
+      type: object
+      required: [challenge_id, otp_code]
+      properties:
+        challenge_id:
+          type: string
+          format: uuid
+        otp_code:
+          type: string
+          example: "381924"
+
+    RegistrationResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/AppUserSummary'
+        message:
+          type: string
+
+    LoginRequest:
+      type: object
+      required: [identifier, password]
+      properties:
+        identifier:
+          type: string
+          description: "Email or phone"
+          example: "alice@example.com"
+        password:
+          type: string
+          example: "password123"
+
+    LoginResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          example: "Bearer"
+        expires_in:
+          type: integer
+          example: 86400
+        user:
+          $ref: '#/components/schemas/AppUserSummary'
+
+    AppUserSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        full_name:
+          type: string
+          nullable: true
+        guest:
+          type: boolean
+
+    # --- Centers / Vehicles ---
+    DeliveryCenter:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+        address_line:
+          type: string
+          nullable: true
+        service_area_geo:
+          type: object
+          nullable: true
+        metadata:
+          type: object
+          nullable: true
+
+    FleetVehicle:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        center_id:
+          type: string
+          format: uuid
+        vehicle_type:
+          type: string
+          enum: [DRONE, ROBOT]
+        available:
+          type: boolean
+        external_device_id:
+          type: string
+          nullable: true
+        telemetry_hint:
+          type: object
+          nullable: true
+        metadata:
+          type: object
+          nullable: true
+
+    # --- Error ---
+    ApiError:
+      type: object
+      properties:
+        code:
+          type: string
+          example: "EMAIL_TAKEN"
+        message:
+          type: string
+          example: "Email is already registered."
+        trace_id:
+          type: string
+          nullable: true
+
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+paths:
+
+  # ── Auth ──────────────────────────────────────────────────────────────────
+
+  /api/v1/auth/register:
+    post:
+      tags: [auth]
+      summary: "1. Initiate registration — generate OTP"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              email_signup:
+                summary: "Sign up with email"
+                value:
+                  email: "new_user@example.com"
+                  password: "MySecret123"
+                  full_name: "Jane Doe"
+              phone_signup:
+                summary: "Sign up with phone"
+                value:
+                  phone: "+14155550199"
+                  password: "MySecret123"
+                  full_name: "Jane Doe"
+      responses:
+        '201':
+          description: OTP challenge created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InitiateRegistrationResponse'
+        '400':
+          description: EMAIL_OR_PHONE_REQUIRED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: EMAIL_TAKEN or PHONE_TAKEN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /api/v1/auth/register/complete:
+    post:
+      tags: [auth]
+      summary: "2. Complete registration — verify OTP"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompleteRegistrationRequest'
+      responses:
+        '201':
+          description: Registration complete, user activated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationResponse'
+        '401':
+          description: OTP_INVALID or OTP_EXPIRED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '404':
+          description: OTP_CHALLENGE_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: OTP_ALREADY_CONSUMED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /api/v1/auth/login:
+    post:
+      tags: [auth]
+      summary: "3. Login — receive JWT"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              alice:
+                summary: "Seed user Alice"
+                value:
+                  identifier: "alice@example.com"
+                  password: "password123"
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: AUTH_INVALID_CREDENTIALS
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /api/v1/auth/me:
+    get:
+      tags: [auth]
+      summary: "4. Current user — verify JWT is alive"
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Authenticated user info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppUserSummary'
+        '401':
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  # ── Centers ───────────────────────────────────────────────────────────────
+
+  /api/v1/centers:
+    get:
+      tags: [centers]
+      summary: List all delivery centers
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Array of delivery centers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeliveryCenter'
+        '401':
+          description: Missing or invalid JWT
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /api/v1/centers/{centerId}:
+    get:
+      tags: [centers]
+      summary: Get a single delivery center
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: centerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: "c0000003-0000-0000-0000-000000000001"
+      responses:
+        '200':
+          description: Delivery center detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeliveryCenter'
+        '404':
+          description: CENTER_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /api/v1/centers/{centerId}/vehicles:
+    get:
+      tags: [centers]
+      summary: List vehicles for a center
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: centerId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: "c0000003-0000-0000-0000-000000000001"
+      responses:
+        '200':
+          description: Array of fleet vehicles in this center
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FleetVehicle'
+        '404':
+          description: CENTER_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  # ── Vehicles ──────────────────────────────────────────────────────────────
+
+  /api/v1/vehicles/{vehicleId}:
+    get:
+      tags: [vehicles]
+      summary: Get a single vehicle by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: vehicleId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Fleet vehicle detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FleetVehicle'
+        '404':
+          description: VEHICLE_NOT_FOUND
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
