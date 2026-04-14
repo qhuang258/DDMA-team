@@ -23,3 +23,9 @@ body {
 .ant-layout-content {
   transition: opacity 0.15s ease;
 }
+
+/* Map vehicle pulse animation */
+@keyframes mapPulse {
+  0%   { transform: translate(-50%, -50%) scale(0.5); opacity: 0.8; }
+  100% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }
+}
