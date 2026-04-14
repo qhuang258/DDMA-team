@@ -1,0 +1,25 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f4f6fd;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Remove Ant Design horizontal menu bottom border */
+.ant-menu-horizontal {
+  border-bottom: none !important;
+}
+
+/* Smooth page transitions */
+.ant-layout-content {
+  transition: opacity 0.15s ease;
+}
