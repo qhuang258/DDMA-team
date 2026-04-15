@@ -191,3 +191,21 @@ export function fetchVehicleDetail(vehicleId: string): Promise<FleetVehicle> {
     method: "GET",
   });
 }
+
+// ================== TRACKING ==================
+
+export interface TrackingState {
+  orderId: string;
+  status: "PENDING" | "IN_TRANSIT" | "DELIVERED" | "CANCELLED";
+  vehicleType: string;
+  simLat: number;
+  simLng: number;
+  simHeadingDeg: number;
+  etaMinutes: number;
+}
+
+export function getTracking(orderId: string): Promise<TrackingState> {
+  return request<TrackingState>(`/api/v1/orders/${orderId}/tracking`, {
+    method: "GET",
+  });
+}
