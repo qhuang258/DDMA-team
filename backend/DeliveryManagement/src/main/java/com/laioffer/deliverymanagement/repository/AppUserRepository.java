@@ -21,4 +21,11 @@ public interface AppUserRepository extends ListCrudRepository<AppUserEntity, UUI
     @Modifying
     @Query("UPDATE app_user SET guest = false, updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :id")
     void activateUser(@Param("id") UUID id);
+
+    // F8 — added by Sida Xue.
+    // Updates fullName and phone for the given user.
+    // Email is intentionally excluded — the backend never allows email changes.
+    @Modifying
+    @Query("UPDATE app_user SET full_name = :fullName, phone = :phone, updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :id")
+    void updateProfile(@Param("id") UUID id, @Param("fullName") String fullName, @Param("phone") String phone);
 }

@@ -164,6 +164,26 @@ export function getMe(): Promise<AppUserSummary> {
   });
 }
 
+// ================== USER PROFILE (F8 — Sida Xue) ==================
+
+// F8 — added by Sida Xue.
+// BEFORE: no profile update function existed in client.ts.
+// AFTER:  UpdateProfileRequest type + updateProfile() calling PUT /api/v1/users/me.
+//         Only fullName and phone are sent; email is omitted because the backend
+//         intentionally ignores it to keep email immutable.
+
+export interface UpdateProfileRequest {
+  fullName: string;
+  phone: string;
+}
+
+export function updateProfile(body: UpdateProfileRequest): Promise<AppUserSummary> {
+  return request<AppUserSummary>("/api/v1/users/me", {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
+}
+
 // ================== CENTER ==================
 
 export function fetchCenters(): Promise<DeliveryCenter[]> {
