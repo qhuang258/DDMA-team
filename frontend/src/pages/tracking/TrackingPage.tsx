@@ -9,6 +9,7 @@ import {
   ArrowLeftOutlined,
 } from "@ant-design/icons";
 import { useParams, useNavigate } from "react-router-dom";
+import { APIProvider, Map, Marker } from "@vis.gl/react-google-maps";
 import { getTracking, TrackingState } from "../../api/client";
 
 const { Title, Text } = Typography;
@@ -34,6 +35,8 @@ function getStepIndex(status: string): number {
   }
 }
 
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string;
+
 export function TrackingPage() {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
@@ -48,7 +51,6 @@ export function TrackingPage() {
       const data = await getTracking(orderId);
       setTracking(data);
       setError(null);
-      // 送达后停止轮询
       if (data.status === "DELIVERED") {
         if (intervalRef.current) clearInterval(intervalRef.current);
       }
@@ -63,7 +65,6 @@ export function TrackingPage() {
   useEffect(() => {
     fetchTracking();
     intervalRef.current = setInterval(fetchTracking, 3000);
-    // 页面卸载时清除定时器
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
@@ -71,9 +72,15 @@ export function TrackingPage() {
 
   const currentStep = tracking ? getStepIndex(tracking.status) : 0;
   const isDelivered = tracking?.status === "DELIVERED";
-  const pin = tracking?.orderId
-    ? (sessionStorage.getItem("handoffPin") ?? "----")
-    : "----";
+  const pin = sessionStorage.getItem("handoffPin") ?? "----";
+
+  const vehiclePosition =
+    tracking?.simLat && tracking?.simLng
+      ? { lat: Number(tracking.simLat), lng: Number(tracking.simLng) }
+      : null;
+
+  // SF 默认中心点
+  const mapCenter = vehiclePosition ?? { lat: 37.7749, lng: -122.4194 };
 
   if (loading) {
     return (
@@ -140,183 +147,33 @@ export function TrackingPage() {
         />
       )}
 
-      {/* Map placeholder */}
+      {/* 真实 Google Maps */}
       <div
         style={{
-          background:
-            "linear-gradient(135deg, #0F1724 0%, #1A2540 50%, #0F2744 100%)",
           borderRadius: 16,
+          overflow: "hidden",
           height: 300,
           marginBottom: 24,
-          position: "relative",
-          overflow: "hidden",
         }}
       >
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundImage:
-              "linear-gradient(rgba(79,110,247,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(79,110,247,0.08) 1px, transparent 1px)",
-            backgroundSize: "48px 48px",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            top: "45%",
-            left: 0,
-            right: 0,
-            height: 2,
-            background: "rgba(79,110,247,0.15)",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            left: "30%",
-            top: 0,
-            bottom: 0,
-            width: 2,
-            background: "rgba(79,110,247,0.12)",
-          }}
-        />
-
-        {/* 目的地标记 */}
-        <div
-          style={{
-            position: "absolute",
-            top: "38%",
-            left: "62%",
-            transform: "translate(-50%, -50%)",
-          }}
-        >
-          <div
-            style={{
-              width: 12,
-              height: 12,
-              background: "#10B981",
-              borderRadius: "50%",
-              border: "2px solid #fff",
-              boxShadow: "0 0 0 4px rgba(16,185,129,0.25)",
-            }}
-          />
-        </div>
-
-        {/* 车辆位置点 */}
-        {!isDelivered && (
-          <div
-            style={{
-              position: "absolute",
-              top: "58%",
-              left: "40%",
-              transform: "translate(-50%, -50%)",
-            }}
+        <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
+          <Map
+            defaultCenter={mapCenter}
+            center={vehiclePosition ?? mapCenter}
+            defaultZoom={15}
+            zoom={15}
+            gestureHandling="greedy"
+            disableDefaultUI={false}
           >
-            <div
-              style={{
-                width: 16,
-                height: 16,
-                background: "#4F6EF7",
-                borderRadius: "50%",
-                border: "2.5px solid #fff",
-                position: "relative",
-                zIndex: 2,
-              }}
-            />
-            <div
-              style={{
-                position: "absolute",
-                top: "50%",
-                left: "50%",
-                transform: "translate(-50%, -50%)",
-                width: 40,
-                height: 40,
-                borderRadius: "50%",
-                background: "rgba(79,110,247,0.25)",
-                animation: "mapPulse 1.8s ease-out infinite",
-              }}
-            />
-          </div>
-        )}
-
-        {/* 左上角信息 */}
-        <div
-          style={{
-            position: "absolute",
-            top: 16,
-            left: 16,
-            background: "rgba(255,255,255,0.10)",
-            backdropFilter: "blur(8px)",
-            borderRadius: 10,
-            padding: "8px 14px",
-          }}
-        >
-          <Text
-            style={{
-              color: "#fff",
-              fontSize: 12,
-              fontWeight: 600,
-              display: "block",
-            }}
-          >
-            {orderId}
-          </Text>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-              marginTop: 2,
-            }}
-          >
-            <div
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                background: isDelivered ? "#10B981" : "#4F6EF7",
-              }}
-            />
-            <Text style={{ color: "rgba(255,255,255,0.7)", fontSize: 11 }}>
-              {tracking?.vehicleType === "DRONE" ? "无人机" : "机器人"} ·{" "}
-              {isDelivered ? "已送达" : "派送中"}
-            </Text>
-          </div>
-        </div>
-
-        {/* ETA */}
-        <div
-          style={{
-            position: "absolute",
-            bottom: 16,
-            right: 16,
-            background: isDelivered ? "#10B981" : "#4F6EF7",
-            borderRadius: 10,
-            padding: "8px 14px",
-          }}
-        >
-          <Text
-            style={{
-              color: "#fff",
-              fontSize: 12,
-              display: "block",
-              opacity: 0.8,
-            }}
-          >
-            {isDelivered ? "已完成" : "预计到达"}
-          </Text>
-          <Text
-            style={{
-              color: "#fff",
-              fontSize: 18,
-              fontWeight: 800,
-              letterSpacing: -0.5,
-            }}
-          >
-            {isDelivered ? "✓" : `~${tracking?.etaMinutes ?? "--"} min`}
-          </Text>
-        </div>
+            {/* 车辆位置 Marker */}
+            {vehiclePosition && (
+              <Marker
+                position={vehiclePosition}
+                title={tracking?.vehicleType === "DRONE" ? "无人机" : "机器人"}
+              />
+            )}
+          </Map>
+        </APIProvider>
       </div>
 
       {/* 送达提示 */}
@@ -346,7 +203,7 @@ export function TrackingPage() {
         >
           订单进度
         </div>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 0 }}>
+        <div style={{ display: "flex", alignItems: "flex-start" }}>
           {STEPS.map((step, i) => {
             const isDone = i < currentStep;
             const isActive = i === currentStep;
@@ -418,6 +275,22 @@ export function TrackingPage() {
           })}
         </div>
       </Card>
+
+      {/* ETA 信息 */}
+      {!isDelivered && tracking && (
+        <Card
+          style={{ marginBottom: 20, borderRadius: 14 }}
+          styles={{ body: { padding: "16px 28px" } }}
+        >
+          <Text type="secondary">预计到达：</Text>
+          <Text
+            strong
+            style={{ fontSize: 20, color: "#4F6EF7", marginLeft: 8 }}
+          >
+            ~{tracking.etaMinutes} 分钟
+          </Text>
+        </Card>
+      )}
 
       {/* PIN + QR */}
       <Card
