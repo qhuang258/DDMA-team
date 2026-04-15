@@ -8,10 +8,13 @@ import {
   Spin,
   Steps,
   Switch,
+  Tag,
   Typography,
   Input,
 } from "antd";
 import {
+  CheckCircleOutlined,
+  CloseCircleOutlined,
   EnvironmentFilled,
   EnvironmentOutlined,
   InboxOutlined,
@@ -22,7 +25,7 @@ import {
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { fetchCenters } from "../../api/client";
+import { fetchCenters, validateAddress, AddressValidateResponse } from "../../api/client";
 
 const { Title, Text } = Typography;
 
@@ -69,11 +72,16 @@ export function OrderWizardPage() {
   const [pickupAddress, setPickupAddress] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
 
+  // Address validation state
+  const [deliveryValidation, setDeliveryValidation] = useState<AddressValidateResponse | null>(null);
+  const [validating, setValidating] = useState(false);
+
   // Package
   const [packageSize, setPackageSize] = useState<PackageSize>("M");
   const [weight, setWeight] = useState<number>(1);
   const [fragile, setFragile] = useState(false);
 
+  // Load delivery centers on mount
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -93,6 +101,33 @@ export function OrderWizardPage() {
     load();
     return () => { cancelled = true; };
   }, []);
+
+  // Debounced address validation — fires 600ms after user stops typing
+  useEffect(() => {
+    if (deliveryAddress.length < 5) {
+      setDeliveryValidation(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        setValidating(true);
+        const result = await validateAddress({ address: deliveryAddress });
+        setDeliveryValidation(result);
+      } catch {
+        setDeliveryValidation(null);
+      } finally {
+        setValidating(false);
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [deliveryAddress]);
+
+  // "Next" is disabled on step 0 if delivery address failed validation
+  const nextDisabled =
+    current === 0 &&
+    deliveryAddress.length >= 5 &&
+    deliveryValidation !== null &&
+    !deliveryValidation.valid;
 
   // ── Step content ──────────────────────────────────────────────
   const stepAddress = (
@@ -119,53 +154,85 @@ export function OrderWizardPage() {
         </div>
       </div>
 
-      {[
-        {
-          label: "取货地址",
-          placeholder: "输入取货地址（将接入 Google Places）",
-          value: pickupAddress,
-          onChange: setPickupAddress,
-          icon: <EnvironmentFilled style={{ color: "#4F6EF7", fontSize: 18 }} />,
-          accentColor: "#4F6EF7",
-        },
-        {
-          label: "送货地址",
-          placeholder: "输入送货地址（将接入 Google Places）",
-          value: deliveryAddress,
-          onChange: setDeliveryAddress,
-          icon: <EnvironmentOutlined style={{ color: "#10B981", fontSize: 18 }} />,
-          accentColor: "#10B981",
-        },
-      ].map(({ label, placeholder, value, onChange, icon, accentColor }) => (
-        <div key={label} style={{ marginBottom: 16 }}>
-          <Text style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.8, color: "#9CA3AF", textTransform: "uppercase" }}>
-            {label}
-          </Text>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              marginTop: 8,
-              background: "#fff",
-              border: `2px solid ${value ? accentColor : "#E5EAFF"}`,
-              borderRadius: 12,
-              padding: "10px 16px",
-              transition: "border-color 0.2s",
-            }}
-          >
-            {icon}
-            <Input
-              bordered={false}
-              size="large"
-              placeholder={placeholder}
-              value={value}
-              onChange={(e) => onChange(e.target.value)}
-              style={{ padding: 0, fontSize: 15, flex: 1 }}
-            />
-          </div>
+      {/* Pickup address — no validation needed */}
+      <div style={{ marginBottom: 16 }}>
+        <Text style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.8, color: "#9CA3AF", textTransform: "uppercase" }}>
+          取货地址
+        </Text>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            marginTop: 8,
+            background: "#fff",
+            border: `2px solid ${pickupAddress ? "#4F6EF7" : "#E5EAFF"}`,
+            borderRadius: 12,
+            padding: "10px 16px",
+            transition: "border-color 0.2s",
+          }}
+        >
+          <EnvironmentFilled style={{ color: "#4F6EF7", fontSize: 18 }} />
+          <Input
+            bordered={false}
+            size="large"
+            placeholder="输入取货地址（将接入 Google Places）"
+            value={pickupAddress}
+            onChange={(e) => setPickupAddress(e.target.value)}
+            style={{ padding: 0, fontSize: 15, flex: 1 }}
+          />
         </div>
-      ))}
+      </div>
+
+      {/* Delivery address — with validation feedback */}
+      <div style={{ marginBottom: 16 }}>
+        <Text style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.8, color: "#9CA3AF", textTransform: "uppercase" }}>
+          送货地址
+        </Text>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            marginTop: 8,
+            background: "#fff",
+            border: `2px solid ${
+              deliveryValidation === null
+                ? deliveryAddress ? "#10B981" : "#E5EAFF"
+                : deliveryValidation.valid ? "#10B981" : "#EF4444"
+            }`,
+            borderRadius: 12,
+            padding: "10px 16px",
+            transition: "border-color 0.2s",
+          }}
+        >
+          <EnvironmentOutlined style={{ color: "#10B981", fontSize: 18 }} />
+          <Input
+            bordered={false}
+            size="large"
+            placeholder="输入送货地址（将接入 Google Places）"
+            value={deliveryAddress}
+            onChange={(e) => setDeliveryAddress(e.target.value)}
+            style={{ padding: 0, fontSize: 15, flex: 1 }}
+          />
+          {validating && <Spin size="small" />}
+        </div>
+
+        {/* Validation tag shown below the delivery address input */}
+        {!validating && deliveryValidation !== null && (
+          <div style={{ marginTop: 6 }}>
+            {deliveryValidation.valid ? (
+              <Tag icon={<CheckCircleOutlined />} color="success">
+                在服务区内
+              </Tag>
+            ) : (
+              <Tag icon={<CloseCircleOutlined />} color="error">
+                不在服务区 — 仅支持旧金山市内配送
+              </Tag>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 
@@ -330,6 +397,7 @@ export function OrderWizardPage() {
             size="large"
             iconPosition="end"
             icon={<ArrowRightOutlined />}
+            disabled={nextDisabled}
             onClick={() => setCurrent((c) => c + 1)}
             style={{ borderRadius: 10, paddingInline: 28 }}
           >
