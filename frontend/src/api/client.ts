@@ -73,6 +73,7 @@ export interface DeliveryCenter {
 }
 
 export type VehicleType = "DRONE" | "ROBOT";
+export type PackageSizeTier = "S" | "M" | "L";
 
 export interface FleetVehicle {
   id: string;
@@ -82,6 +83,36 @@ export interface FleetVehicle {
   external_device_id?: string | null;
   telemetry_hint?: Record<string, unknown> | null;
   metadata?: Record<string, unknown> | null;
+}
+
+export interface CreateOrderRequest {
+  center_id: string;
+  pickup_address: string;
+  pickup_lat?: number | null;
+  pickup_lng?: number | null;
+  dropoff_address: string;
+  dropoff_lat?: number | null;
+  dropoff_lng?: number | null;
+}
+
+export interface CreateOrderResponse {
+  order_id: string;
+  status: string;
+  created_at: string;
+}
+
+export interface CreateParcelRequest {
+  size_tier: PackageSizeTier;
+  weight_kg: number;
+  fragile: boolean;
+  delivery_notes?: string | null;
+}
+
+export interface CreateParcelResponse {
+  parcel_id: string;
+  order_id: string;
+  size_tier: PackageSizeTier;
+  weight_kg: number;
 }
 
 function buildAuthHeaders(token?: string): HeadersInit {
@@ -189,5 +220,26 @@ export function fetchVehicles(centerId: string): Promise<FleetVehicle[]> {
 export function fetchVehicleDetail(vehicleId: string): Promise<FleetVehicle> {
   return request<FleetVehicle>(`/api/v1/vehicles/${vehicleId}`, {
     method: "GET",
+  });
+}
+
+// ================== ORDER ==================
+
+export function createOrder(
+  body: CreateOrderRequest,
+): Promise<CreateOrderResponse> {
+  return request<CreateOrderResponse>("/api/v1/orders", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function addParcel(
+  orderId: string,
+  body: CreateParcelRequest,
+): Promise<CreateParcelResponse> {
+  return request<CreateParcelResponse>(`/api/v1/orders/${orderId}/parcels`, {
+    method: "POST",
+    body: JSON.stringify(body),
   });
 }

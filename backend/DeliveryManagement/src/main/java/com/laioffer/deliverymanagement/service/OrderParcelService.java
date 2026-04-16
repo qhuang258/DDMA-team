@@ -1,10 +1,13 @@
 package com.laioffer.deliverymanagement.service;
 
+import com.laioffer.deliverymanagement.api.ApiException;
 import com.laioffer.deliverymanagement.dto.OrderParcelDto;
 import com.laioffer.deliverymanagement.entity.OrderParcelEntity;
 import com.laioffer.deliverymanagement.repository.OrderParcelRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,8 +33,41 @@ public class OrderParcelService {
         return repository.findById(id).map(OrderParcelService::toDto);
     }
 
+    @Transactional
+    public OrderParcelDto createParcel(
+            UUID orderId,
+            String sizeTier,
+            BigDecimal weightKg,
+            boolean fragile,
+            String deliveryNotes
+    ) {
+        if (repository.findByOrderId(orderId).isPresent()) {
+            throw new ApiException(409, "PARCEL_ALREADY_EXISTS", "A parcel already exists for this order.");
+        }
+
+        OrderParcelEntity saved = repository.save(new OrderParcelEntity(
+                null,
+                orderId,
+                sizeTier,
+                weightKg,
+                fragile,
+                normalizeText(deliveryNotes),
+                null,
+                null
+        ));
+        return toDto(saved);
+    }
+
     public long count() {
         return repository.count();
+    }
+
+    private static String normalizeText(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     private static OrderParcelDto toDto(OrderParcelEntity e) {

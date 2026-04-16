@@ -1,350 +1,482 @@
 import {
   Alert,
   Button,
+  Card,
   Col,
+  Input,
   InputNumber,
   Row,
   Select,
+  Space,
   Spin,
   Steps,
   Switch,
   Typography,
-  Input,
 } from "antd";
 import {
+  ArrowLeftOutlined,
+  ArrowRightOutlined,
+  CheckCircleFilled,
   EnvironmentFilled,
   EnvironmentOutlined,
   InboxOutlined,
-  CheckCircleFilled,
-  ArrowRightOutlined,
-  ArrowLeftOutlined,
-  ThunderboltOutlined,
 } from "@ant-design/icons";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { fetchCenters } from "../../api/client";
+import {
+  addParcel,
+  createOrder,
+  fetchCenters,
+  type DeliveryCenter,
+  type PackageSizeTier,
+} from "../../api/client";
 
 const { Title, Text } = Typography;
 
-const PACKAGE_SIZES = [
+const ORDER_DRAFT_STORAGE_KEY = "order_draft";
+
+const PACKAGE_OPTIONS: Array<{
+  key: PackageSizeTier;
+  label: string;
+  description: string;
+  maxWeight: number;
+  dimensions: string;
+  iconSize: number;
+}> = [
   {
     key: "S",
-    label: "小号",
-    sublabel: "文件 · 小礼品",
-    maxWeight: "3 kg",
-    dims: "28 × 20 × 15 cm",
-    iconSize: 32,
+    label: "Small",
+    description: "Documents and compact items",
+    maxWeight: 3,
+    dimensions: "28 x 20 x 15 cm",
+    iconSize: 30,
   },
   {
     key: "M",
-    label: "中号",
-    sublabel: "日用品 · 衣物",
-    maxWeight: "10 kg",
-    dims: "40 × 30 × 20 cm",
-    iconSize: 40,
+    label: "Medium",
+    description: "Daily goods and apparel",
+    maxWeight: 10,
+    dimensions: "40 x 30 x 20 cm",
+    iconSize: 38,
   },
   {
     key: "L",
-    label: "大号",
-    sublabel: "家电 · 大件包裹",
-    maxWeight: "25 kg",
-    dims: "60 × 40 × 40 cm",
-    iconSize: 48,
+    label: "Large",
+    description: "Bulkier packages",
+    maxWeight: 25,
+    dimensions: "60 x 40 x 40 cm",
+    iconSize: 46,
   },
 ];
 
-type PackageSize = "S" | "M" | "L";
+type CenterOption = {
+  label: string;
+  value: string;
+  latitude: number;
+  longitude: number;
+  addressLine?: string | null;
+};
+
+function toCenterOption(center: DeliveryCenter): CenterOption {
+  return {
+    label: center.name,
+    value: center.id,
+    latitude: center.latitude,
+    longitude: center.longitude,
+    addressLine: center.address_line,
+  };
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return "Unable to submit the order right now.";
+}
 
 export function OrderWizardPage() {
   const navigate = useNavigate();
   const [current, setCurrent] = useState(0);
 
-  // Centers
-  const [centers, setCenters] = useState<{ label: string; value: string }[]>([]);
-  const [selectedCenterId, setSelectedCenterId] = useState<string | undefined>();
+  const [centers, setCenters] = useState<CenterOption[]>([]);
+  const [selectedCenterId, setSelectedCenterId] = useState<string>();
   const [loadingCenters, setLoadingCenters] = useState(false);
   const [centersError, setCentersError] = useState<string | null>(null);
 
-  // Address
   const [pickupAddress, setPickupAddress] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
-
-  // Package
-  const [packageSize, setPackageSize] = useState<PackageSize>("M");
+  const [packageSize, setPackageSize] = useState<PackageSizeTier>("M");
   const [weight, setWeight] = useState<number>(1);
   const [fragile, setFragile] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    const load = async () => {
+
+    const loadCenters = async () => {
       try {
         setLoadingCenters(true);
-        const data = await fetchCenters();
-        if (cancelled) return;
-        const opts = data.map((c) => ({ label: c.name, value: c.id }));
-        setCenters(opts);
-        if (opts.length > 0) setSelectedCenterId((v) => v ?? opts[0].value);
-      } catch (err) {
-        if (!cancelled) setCentersError(err instanceof Error ? err.message : "加载失败");
+        setCentersError(null);
+
+        const result = await fetchCenters();
+        if (cancelled) {
+          return;
+        }
+
+        const options = result.map(toCenterOption);
+        setCenters(options);
+        if (options.length > 0) {
+          setSelectedCenterId((currentValue) => currentValue ?? options[0].value);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setCentersError(getErrorMessage(error));
+        }
       } finally {
-        if (!cancelled) setLoadingCenters(false);
+        if (!cancelled) {
+          setLoadingCenters(false);
+        }
       }
     };
-    load();
-    return () => { cancelled = true; };
+
+    void loadCenters();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // ── Step content ──────────────────────────────────────────────
-  const stepAddress = (
-    <div style={{ maxWidth: 560 }}>
-      <div style={{ marginBottom: 20 }}>
-        <Text style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.8, color: "#9CA3AF", textTransform: "uppercase" }}>
-          配送中心
-        </Text>
-        <div style={{ marginTop: 8 }}>
-          {loadingCenters ? (
-            <Spin size="small" />
-          ) : centersError ? (
-            <Alert type="error" showIcon message={centersError} />
-          ) : (
-            <Select
-              size="large"
-              style={{ width: "100%" }}
-              placeholder="请选择配送中心"
-              options={centers}
-              value={selectedCenterId}
-              onChange={setSelectedCenterId}
-            />
-          )}
-        </div>
-      </div>
-
-      {[
-        {
-          label: "取货地址",
-          placeholder: "输入取货地址（将接入 Google Places）",
-          value: pickupAddress,
-          onChange: setPickupAddress,
-          icon: <EnvironmentFilled style={{ color: "#4F6EF7", fontSize: 18 }} />,
-          accentColor: "#4F6EF7",
-        },
-        {
-          label: "送货地址",
-          placeholder: "输入送货地址（将接入 Google Places）",
-          value: deliveryAddress,
-          onChange: setDeliveryAddress,
-          icon: <EnvironmentOutlined style={{ color: "#10B981", fontSize: 18 }} />,
-          accentColor: "#10B981",
-        },
-      ].map(({ label, placeholder, value, onChange, icon, accentColor }) => (
-        <div key={label} style={{ marginBottom: 16 }}>
-          <Text style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.8, color: "#9CA3AF", textTransform: "uppercase" }}>
-            {label}
-          </Text>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              marginTop: 8,
-              background: "#fff",
-              border: `2px solid ${value ? accentColor : "#E5EAFF"}`,
-              borderRadius: 12,
-              padding: "10px 16px",
-              transition: "border-color 0.2s",
-            }}
-          >
-            {icon}
-            <Input
-              bordered={false}
-              size="large"
-              placeholder={placeholder}
-              value={value}
-              onChange={(e) => onChange(e.target.value)}
-              style={{ padding: 0, fontSize: 15, flex: 1 }}
-            />
-          </div>
-        </div>
-      ))}
-    </div>
+  const selectedCenter = useMemo(
+    () => centers.find((center) => center.value === selectedCenterId),
+    [centers, selectedCenterId],
   );
 
-  const stepPackage = (
-    <div>
-      <Row gutter={[16, 16]} style={{ marginBottom: 28 }}>
-        {PACKAGE_SIZES.map((pkg) => {
-          const selected = packageSize === pkg.key;
+  const selectedPackage = useMemo(
+    () => PACKAGE_OPTIONS.find((option) => option.key === packageSize) ?? PACKAGE_OPTIONS[1],
+    [packageSize],
+  );
+
+  useEffect(() => {
+    if (weight > selectedPackage.maxWeight) {
+      setWeight(selectedPackage.maxWeight);
+    }
+  }, [selectedPackage.maxWeight, weight]);
+
+  const canContinueFromAddress =
+    !!selectedCenterId && pickupAddress.trim().length > 0 && deliveryAddress.trim().length > 0;
+  const canSubmit = canContinueFromAddress && weight > 0 && weight <= selectedPackage.maxWeight;
+
+  const handleNext = () => {
+    if (current === 0 && !canContinueFromAddress) {
+      return;
+    }
+    setCurrent((step) => step + 1);
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedCenterId || !selectedCenter) {
+      setSubmitError("Please select a delivery center.");
+      return;
+    }
+
+    if (!canSubmit) {
+      setSubmitError("Please complete the order details before submitting.");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setSubmitError(null);
+
+      const order = await createOrder({
+        center_id: selectedCenterId,
+        pickup_address: pickupAddress.trim(),
+        pickup_lat: selectedCenter.latitude,
+        pickup_lng: selectedCenter.longitude,
+        dropoff_address: deliveryAddress.trim(),
+      });
+
+      const parcel = await addParcel(order.order_id, {
+        size_tier: packageSize,
+        weight_kg: weight,
+        fragile,
+        delivery_notes: null,
+      });
+
+      window.sessionStorage.setItem(
+        ORDER_DRAFT_STORAGE_KEY,
+        JSON.stringify({
+          orderId: order.order_id,
+          centerId: selectedCenterId,
+          centerName: selectedCenter.label,
+          centerAddress: selectedCenter.addressLine ?? null,
+          pickupAddress: pickupAddress.trim(),
+          pickupLat: selectedCenter.latitude,
+          pickupLng: selectedCenter.longitude,
+          dropoffAddress: deliveryAddress.trim(),
+          dropoffLat: null,
+          dropoffLng: null,
+          parcel: {
+            parcelId: parcel.parcel_id,
+            sizeTier: packageSize,
+            weightKg: weight,
+            fragile,
+          },
+        }),
+      );
+
+      navigate(`/recommendations?orderId=${encodeURIComponent(order.order_id)}`);
+    } catch (error) {
+      setSubmitError(getErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const addressStep = (
+    <Space direction="vertical" size={20} style={{ width: "100%", maxWidth: 620 }}>
+      <div>
+        <Text strong style={{ display: "block", marginBottom: 8 }}>
+          Delivery center
+        </Text>
+        {loadingCenters ? (
+          <Spin />
+        ) : centersError ? (
+          <Alert type="error" showIcon message={centersError} />
+        ) : (
+          <Select
+            size="large"
+            style={{ width: "100%" }}
+            placeholder="Select a delivery center"
+            options={centers}
+            value={selectedCenterId}
+            onChange={setSelectedCenterId}
+          />
+        )}
+      </div>
+
+      <Card bordered={false} style={{ background: "#F7F9FF" }}>
+        <Space direction="vertical" size={16} style={{ width: "100%" }}>
+          <div>
+            <Text strong style={{ display: "block", marginBottom: 8 }}>
+              Pickup address
+            </Text>
+            <Input
+              size="large"
+              prefix={<EnvironmentFilled style={{ color: "#4F6EF7" }} />}
+              placeholder="Enter the pickup address"
+              value={pickupAddress}
+              onChange={(event) => setPickupAddress(event.target.value)}
+            />
+          </div>
+
+          <div>
+            <Text strong style={{ display: "block", marginBottom: 8 }}>
+              Dropoff address
+            </Text>
+            <Input
+              size="large"
+              prefix={<EnvironmentOutlined style={{ color: "#10B981" }} />}
+              placeholder="Enter the dropoff address"
+              value={deliveryAddress}
+              onChange={(event) => setDeliveryAddress(event.target.value)}
+            />
+          </div>
+
+          {selectedCenter?.addressLine ? (
+            <Alert
+              type="info"
+              showIcon
+              message={`Selected center address: ${selectedCenter.addressLine}`}
+            />
+          ) : null}
+        </Space>
+      </Card>
+    </Space>
+  );
+
+  const packageStep = (
+    <Space direction="vertical" size={24} style={{ width: "100%" }}>
+      <Row gutter={[16, 16]}>
+        {PACKAGE_OPTIONS.map((option) => {
+          const selected = packageSize === option.key;
           return (
-            <Col xs={24} sm={8} key={pkg.key}>
-              <div
-                onClick={() => setPackageSize(pkg.key as PackageSize)}
+            <Col xs={24} sm={8} key={option.key}>
+              <Card
+                hoverable
+                onClick={() => setPackageSize(option.key)}
                 style={{
-                  border: `2px solid ${selected ? "#4F6EF7" : "#E5EAFF"}`,
-                  borderRadius: 14,
-                  padding: "24px 20px",
-                  cursor: "pointer",
-                  background: selected ? "#EEF2FF" : "#fff",
-                  transition: "all 0.18s ease",
-                  position: "relative",
-                  textAlign: "center",
-                  userSelect: "none",
+                  borderColor: selected ? "#4F6EF7" : "#E5EAFF",
+                  background: selected ? "#EEF2FF" : "#FFFFFF",
                 }}
               >
-                {selected && (
-                  <CheckCircleFilled
+                <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                  <InboxOutlined
                     style={{
-                      position: "absolute",
-                      top: 12,
-                      right: 12,
-                      color: "#4F6EF7",
-                      fontSize: 18,
+                      fontSize: option.iconSize,
+                      color: selected ? "#4F6EF7" : "#9CA3AF",
                     }}
                   />
-                )}
-                <InboxOutlined
-                  style={{
-                    fontSize: pkg.iconSize,
-                    color: selected ? "#4F6EF7" : "#C4CCDD",
-                    marginBottom: 12,
-                    display: "block",
-                    transition: "color 0.18s",
-                  }}
-                />
-                <div style={{ fontWeight: 700, fontSize: 18, color: "#1A1D2E", marginBottom: 2 }}>
-                  {pkg.label}
-                </div>
-                <div style={{ fontSize: 12, color: "#9CA3AF", marginBottom: 12 }}>
-                  {pkg.sublabel}
-                </div>
-                <div
-                  style={{
-                    background: selected ? "rgba(79,110,247,0.08)" : "#F4F6FD",
-                    borderRadius: 8,
-                    padding: "6px 10px",
-                  }}
-                >
-                  <div style={{ fontSize: 11, color: "#6B7280" }}>最大 {pkg.maxWeight}</div>
-                  <div style={{ fontSize: 11, color: "#6B7280" }}>{pkg.dims}</div>
-                </div>
-              </div>
+                  <div>
+                    <Text strong>{option.label}</Text>
+                    {selected ? (
+                      <CheckCircleFilled style={{ color: "#4F6EF7", marginLeft: 8 }} />
+                    ) : null}
+                  </div>
+                  <Text type="secondary">{option.description}</Text>
+                  <Text type="secondary">{`Up to ${option.maxWeight} kg`}</Text>
+                  <Text type="secondary">{option.dimensions}</Text>
+                </Space>
+              </Card>
             </Col>
           );
         })}
       </Row>
 
-      <div style={{ maxWidth: 380, display: "flex", flexDirection: "column", gap: 16 }}>
-        <div>
-          <Text style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.8, color: "#9CA3AF", textTransform: "uppercase", display: "block", marginBottom: 8 }}>
-            实际重量 (kg)
+      <Row gutter={[16, 16]}>
+        <Col xs={24} md={12}>
+          <Text strong style={{ display: "block", marginBottom: 8 }}>
+            Weight (kg)
           </Text>
           <InputNumber
             min={0.1}
-            max={50}
+            max={selectedPackage.maxWeight}
             step={0.1}
             value={weight}
-            onChange={(v) => setWeight(v ?? 1)}
+            onChange={(value) => setWeight(value ?? 1)}
             size="large"
-            style={{ width: "100%", borderRadius: 10 }}
+            style={{ width: "100%" }}
           />
-        </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fff", border: "2px solid #E5EAFF", borderRadius: 12, padding: "14px 16px" }}>
-          <div>
-            <div style={{ fontWeight: 600, fontSize: 15, color: "#1A1D2E" }}>易碎物品</div>
-            <div style={{ fontSize: 12, color: "#9CA3AF" }}>需要轻拿轻放</div>
-          </div>
-          <Switch checked={fragile} onChange={setFragile} />
-        </div>
-      </div>
-    </div>
+          <Text type="secondary" style={{ display: "block", marginTop: 8 }}>
+            {`Current limit for ${selectedPackage.label}: ${selectedPackage.maxWeight} kg`}
+          </Text>
+        </Col>
+        <Col xs={24} md={12}>
+          <Card size="small" style={{ height: "100%" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <Text strong>Fragile item</Text>
+                <Text type="secondary" style={{ display: "block" }}>
+                  Extra care is required during delivery.
+                </Text>
+              </div>
+              <Switch checked={fragile} onChange={setFragile} />
+            </div>
+          </Card>
+        </Col>
+      </Row>
+    </Space>
   );
 
-  const selectedPkg = PACKAGE_SIZES.find((p) => p.key === packageSize)!;
-
-  const stepReview = (
-    <div style={{ maxWidth: 520 }}>
-      <div style={{ background: "#F4F6FD", borderRadius: 14, padding: 24, marginBottom: 20 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.8, color: "#9CA3AF", textTransform: "uppercase", marginBottom: 16 }}>
-          订单摘要
-        </div>
-        {[
-          { label: "配送中心", value: centers.find((c) => c.value === selectedCenterId)?.label ?? "—" },
-          { label: "取货地址", value: pickupAddress || "（未填写）" },
-          { label: "送货地址", value: deliveryAddress || "（未填写）" },
-          { label: "包裹尺寸", value: `${selectedPkg.label}（${selectedPkg.dims}）` },
-          { label: "实际重量", value: `${weight} kg` },
-          { label: "易碎物品", value: fragile ? "是" : "否" },
-        ].map(({ label, value }) => (
-          <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-            <Text type="secondary" style={{ fontSize: 13 }}>{label}</Text>
-            <Text strong style={{ fontSize: 13, textAlign: "right", maxWidth: 280 }}>{value}</Text>
+  const reviewStep = (
+    <Space direction="vertical" size={16} style={{ width: "100%", maxWidth: 620 }}>
+      <Card bordered={false} style={{ background: "#F7F9FF" }}>
+        <Space direction="vertical" size={12} style={{ width: "100%" }}>
+          <Title level={4} style={{ margin: 0 }}>
+            Order review
+          </Title>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <Text type="secondary">Delivery center</Text>
+            <Text strong>{selectedCenter?.label ?? "-"}</Text>
           </div>
-        ))}
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#10B981", fontSize: 13 }}>
-        <ThunderboltOutlined />
-        <span>准备好了！点击下方按钮查看最优配送方案。</span>
-      </div>
-    </div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <Text type="secondary">Pickup</Text>
+            <Text strong style={{ textAlign: "right" }}>
+              {pickupAddress || "-"}
+            </Text>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <Text type="secondary">Dropoff</Text>
+            <Text strong style={{ textAlign: "right" }}>
+              {deliveryAddress || "-"}
+            </Text>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <Text type="secondary">Package</Text>
+            <Text strong>{selectedPackage.label}</Text>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <Text type="secondary">Weight</Text>
+            <Text strong>{`${weight} kg`}</Text>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+            <Text type="secondary">Fragile</Text>
+            <Text strong>{fragile ? "Yes" : "No"}</Text>
+          </div>
+        </Space>
+      </Card>
+
+      {submitError ? <Alert type="error" showIcon message={submitError} /> : null}
+    </Space>
   );
 
   const steps = [
-    { title: "地址", content: stepAddress },
-    { title: "包裹", content: stepPackage },
-    { title: "确认", content: stepReview },
+    { title: "Address", content: addressStep },
+    { title: "Package", content: packageStep },
+    { title: "Review", content: reviewStep },
   ];
 
   return (
     <div>
-      {/* Page header */}
       <div style={{ marginBottom: 32 }}>
-        <Title level={2} style={{ margin: "0 0 4px", color: "#1A1D2E", letterSpacing: -0.5 }}>
-          创建新订单
+        <Title level={2} style={{ marginBottom: 8 }}>
+          Create a delivery order
         </Title>
-        <Text type="secondary">填写配送信息，获取最优自动驾驶方案</Text>
+        <Text type="secondary">
+          Submit the address and package details first, then continue to plan selection.
+        </Text>
       </div>
 
-      {/* Steps indicator */}
       <Steps
         current={current}
-        items={steps.map((s) => ({ title: s.title }))}
-        style={{ marginBottom: 36, maxWidth: 500 }}
+        items={steps.map((step) => ({ title: step.title }))}
+        style={{ maxWidth: 560, marginBottom: 32 }}
       />
 
-      {/* Step content */}
-      <div style={{ minHeight: 280, marginBottom: 36 }}>
-        {steps[current].content}
-      </div>
+      <div style={{ minHeight: 320, marginBottom: 32 }}>{steps[current].content}</div>
 
-      {/* Navigation */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", maxWidth: 560, paddingTop: 20, borderTop: "1px solid #E5EAFF" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 16,
+          borderTop: "1px solid #E5EAFF",
+          paddingTop: 20,
+          maxWidth: 620,
+        }}
+      >
         {current > 0 ? (
-          <Button icon={<ArrowLeftOutlined />} size="large" onClick={() => setCurrent((c) => c - 1)} style={{ borderRadius: 10 }}>
-            上一步
+          <Button icon={<ArrowLeftOutlined />} size="large" onClick={() => setCurrent((step) => step - 1)}>
+            Back
           </Button>
         ) : (
           <div />
         )}
+
         {current < steps.length - 1 ? (
           <Button
             type="primary"
-            size="large"
-            iconPosition="end"
             icon={<ArrowRightOutlined />}
-            onClick={() => setCurrent((c) => c + 1)}
-            style={{ borderRadius: 10, paddingInline: 28 }}
+            iconPosition="end"
+            size="large"
+            onClick={handleNext}
+            disabled={current === 0 && !canContinueFromAddress}
           >
-            下一步
+            Next
           </Button>
         ) : (
           <Button
             type="primary"
-            size="large"
-            iconPosition="end"
             icon={<ArrowRightOutlined />}
-            onClick={() => navigate("/recommendations")}
-            style={{ borderRadius: 10, paddingInline: 28 }}
+            iconPosition="end"
+            size="large"
+            loading={submitting}
+            onClick={() => void handleSubmit()}
+            disabled={!canSubmit}
           >
-            查看交付选项
+            View delivery options
           </Button>
         )}
       </div>

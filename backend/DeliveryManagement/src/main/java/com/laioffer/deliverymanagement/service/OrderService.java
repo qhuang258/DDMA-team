@@ -4,7 +4,9 @@ import com.laioffer.deliverymanagement.dto.OrderDto;
 import com.laioffer.deliverymanagement.entity.OrderEntity;
 import com.laioffer.deliverymanagement.repository.OrderRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,6 +30,41 @@ public class OrderService {
 
     public Optional<OrderDto> findById(UUID id) {
         return repository.findById(id).map(OrderService::toDto);
+    }
+
+    @Transactional
+    public OrderDto createOrder(
+            UUID userId,
+            UUID centerId,
+            String pickupSummary,
+            String dropoffSummary
+    ) {
+        OffsetDateTime now = OffsetDateTime.now();
+        OrderEntity saved = repository.save(new OrderEntity(
+                null,
+                userId,
+                centerId,
+                null,
+                "PENDING",
+                null,
+                pickupSummary,
+                dropoffSummary,
+                null,
+                null,
+                null,
+                "USD",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                now,
+                now,
+                0,
+                null
+        ));
+        return toDto(saved);
     }
 
     public long count() {
