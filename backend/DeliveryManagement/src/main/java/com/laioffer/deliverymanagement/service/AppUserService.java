@@ -64,6 +64,15 @@ public class AppUserService {
         return repository.findById(id).map(AppUserService::toDto);
     }
 
+    // F8
+    // Persists fullName and phone changes, then re-fetches to return the updated record.
+    // Follows the same pattern as activateUser(): @Modifying query + re-fetch.
+    @Transactional
+    public Optional<AppUserDto> updateProfile(UUID id, String fullName, String phone) {
+        repository.updateProfile(id, fullName, phone);
+        return repository.findById(id).map(AppUserService::toDto);
+    }
+
     public long count() {
         return repository.count();
     }
