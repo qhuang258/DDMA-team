@@ -223,6 +223,28 @@ export function fetchVehicleDetail(vehicleId: string): Promise<FleetVehicle> {
   });
 }
 
+// ================== VALIDATION ==================
+
+export interface AddressValidateRequest {
+  address: string;
+  lat?: number;
+  lng?: number;
+}
+
+export interface AddressValidateResponse {
+  valid: boolean;
+  message: string;
+}
+
+export function validateAddress(
+  body: AddressValidateRequest,
+): Promise<AddressValidateResponse> {
+  return request<AddressValidateResponse>("/api/v1/validate/address", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 // ================== ORDER ==================
 
 export function createOrder(

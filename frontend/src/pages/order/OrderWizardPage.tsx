@@ -11,12 +11,15 @@ import {
   Spin,
   Steps,
   Switch,
+  Tag,
   Typography,
 } from "antd";
 import {
   ArrowLeftOutlined,
   ArrowRightOutlined,
   CheckCircleFilled,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
   EnvironmentFilled,
   EnvironmentOutlined,
   InboxOutlined,
@@ -27,6 +30,8 @@ import {
   addParcel,
   createOrder,
   fetchCenters,
+  validateAddress,
+  type AddressValidateResponse,
   type DeliveryCenter,
   type PackageSizeTier,
 } from "../../api/client";
@@ -105,6 +110,10 @@ export function OrderWizardPage() {
 
   const [pickupAddress, setPickupAddress] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [deliveryValidation, setDeliveryValidation] =
+    useState<AddressValidateResponse | null>(null);
+  const [validating, setValidating] = useState(false);
+
   const [packageSize, setPackageSize] = useState<PackageSizeTier>("M");
   const [weight, setWeight] = useState<number>(1);
   const [fragile, setFragile] = useState(false);
@@ -152,6 +161,40 @@ export function OrderWizardPage() {
     [centers, selectedCenterId],
   );
 
+  useEffect(() => {
+    const trimmedAddress = deliveryAddress.trim();
+
+    if (trimmedAddress.length < 5) {
+      setDeliveryValidation(null);
+      setValidating(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        setValidating(true);
+        const result = await validateAddress({ address: trimmedAddress });
+        if (!cancelled) {
+          setDeliveryValidation(result);
+        }
+      } catch {
+        if (!cancelled) {
+          setDeliveryValidation(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setValidating(false);
+        }
+      }
+    }, 600);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [deliveryAddress]);
+
   const selectedPackage = useMemo(
     () => PACKAGE_OPTIONS.find((option) => option.key === packageSize) ?? PACKAGE_OPTIONS[1],
     [packageSize],
@@ -163,9 +206,21 @@ export function OrderWizardPage() {
     }
   }, [selectedPackage.maxWeight, weight]);
 
+  const deliveryValidationFailed =
+    deliveryAddress.trim().length >= 5 &&
+    deliveryValidation !== null &&
+    !deliveryValidation.valid;
+
   const canContinueFromAddress =
-    !!selectedCenterId && pickupAddress.trim().length > 0 && deliveryAddress.trim().length > 0;
-  const canSubmit = canContinueFromAddress && weight > 0 && weight <= selectedPackage.maxWeight;
+    !!selectedCenterId &&
+    pickupAddress.trim().length > 0 &&
+    deliveryAddress.trim().length > 0 &&
+    !deliveryValidationFailed;
+
+  const canSubmit =
+    canContinueFromAddress &&
+    weight > 0 &&
+    weight <= selectedPackage.maxWeight;
 
   const handleNext = () => {
     if (current === 0 && !canContinueFromAddress) {
@@ -281,7 +336,22 @@ export function OrderWizardPage() {
               placeholder="Enter the dropoff address"
               value={deliveryAddress}
               onChange={(event) => setDeliveryAddress(event.target.value)}
+              suffix={validating ? <Spin size="small" /> : null}
             />
+
+            {!validating && deliveryValidation !== null ? (
+              <div style={{ marginTop: 10 }}>
+                {deliveryValidation.valid ? (
+                  <Tag icon={<CheckCircleOutlined />} color="success">
+                    In service area
+                  </Tag>
+                ) : (
+                  <Tag icon={<CloseCircleOutlined />} color="error">
+                    Outside service area
+                  </Tag>
+                )}
+              </div>
+            ) : null}
           </div>
 
           {selectedCenter?.addressLine ? (
@@ -448,7 +518,11 @@ export function OrderWizardPage() {
         }}
       >
         {current > 0 ? (
-          <Button icon={<ArrowLeftOutlined />} size="large" onClick={() => setCurrent((step) => step - 1)}>
+          <Button
+            icon={<ArrowLeftOutlined />}
+            size="large"
+            onClick={() => setCurrent((step) => step - 1)}
+          >
             Back
           </Button>
         ) : (
