@@ -2,8 +2,10 @@ package com.laioffer.deliverymanagement.tracking;
 
 import com.laioffer.deliverymanagement.api.ApiException;
 import com.laioffer.deliverymanagement.auth.AuthenticatedUser;
+import com.laioffer.deliverymanagement.dto.DeliveryCenterDto;
 import com.laioffer.deliverymanagement.entity.OrderEntity;
 import com.laioffer.deliverymanagement.repository.OrderRepository;
+import com.laioffer.deliverymanagement.service.DeliveryCenterService;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,9 +23,11 @@ import java.util.UUID;
 public class TrackingController {
 
     private final OrderRepository orderRepository;
+    private final DeliveryCenterService deliveryCenterService;
 
-    public TrackingController(OrderRepository orderRepository) {
+    public TrackingController(OrderRepository orderRepository, DeliveryCenterService deliveryCenterService) {
         this.orderRepository = orderRepository;
+        this.deliveryCenterService = deliveryCenterService;
     }
 
     @GetMapping("/{orderId}/tracking")
@@ -41,7 +45,23 @@ public class TrackingController {
             throw new ApiException(403, "FORBIDDEN", "You do not have access to this order.");
         }
 
+        // Look up delivery center coordinates for the start marker
+        BigDecimal startLat = null;
+        BigDecimal startLng = null;
+        if (order.centerId() != null) {
+            startLat = deliveryCenterService.findById(order.centerId())
+                    .map(DeliveryCenterDto::latitude).orElse(null);
+            startLng = deliveryCenterService.findById(order.centerId())
+                    .map(DeliveryCenterDto::longitude).orElse(null);
+        }
+
         if ("DELIVERED".equals(order.status())) {
+            BigDecimal dLat = null, dLng = null;
+            try {
+                var state = order.trackingState().value();
+                dLat = extractDecimal(state, "dropoffLat");
+                dLng = extractDecimal(state, "dropoffLng");
+            } catch (Exception ignored) {}
             return new TrackingResponse(
                     order.id(),
                     "DELIVERED",
@@ -50,7 +70,8 @@ public class TrackingController {
                     order.simLatitude(),
                     order.simLongitude(),
                     order.simHeadingDeg(),
-                    0
+                    0,
+                    startLat, startLng, dLat, dLng
             );
         }
 
@@ -121,7 +142,8 @@ public class TrackingController {
                 newLat,
                 newLng,
                 newHeading,
-                etaMinutes
+                etaMinutes,
+                startLat, startLng, dropoffLat, dropoffLng
         );
     }
 

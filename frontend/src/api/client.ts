@@ -339,6 +339,10 @@ export interface TrackingState {
   sim_lng: number;
   sim_heading_deg: number;
   eta_minutes: number;
+  start_lat?: number | null;
+  start_lng?: number | null;
+  dropoff_lat?: number | null;
+  dropoff_lng?: number | null;
 }
 
 export function getTracking(orderId: string): Promise<TrackingState> {

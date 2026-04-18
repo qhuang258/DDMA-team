@@ -11,5 +11,9 @@ public record TrackingResponse(
         BigDecimal simLat,
         BigDecimal simLng,
         BigDecimal simHeadingDeg,
-        Integer etaMinutes
+        Integer etaMinutes,
+        BigDecimal startLat,
+        BigDecimal startLng,
+        BigDecimal dropoffLat,
+        BigDecimal dropoffLng
 ) {}

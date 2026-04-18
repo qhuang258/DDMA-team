@@ -9,7 +9,13 @@ import {
   RocketOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useParams } from "react-router-dom";
-import { APIProvider, Map, Marker } from "@vis.gl/react-google-maps";
+import {
+  AdvancedMarker,
+  APIProvider,
+  Map,
+  useMap,
+  useMapsLibrary,
+} from "@vis.gl/react-google-maps";
 import { getTracking, type TrackingState } from "../../api/client";
 
 const { Title, Text } = Typography;
@@ -36,6 +42,122 @@ function getStepIndex(status: string): number {
       return 0;
   }
 }
+
+// ── Marker styles ─────────────────────────────────────────────────────────────
+
+const markerBase: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 36,
+  height: 36,
+  borderRadius: "50% 50% 50% 0",
+  transform: "rotate(-45deg)",
+  border: "2px solid #fff",
+  boxShadow: "0 2px 6px rgba(0,0,0,0.30)",
+  fontSize: 16,
+};
+
+const emojiStyle: React.CSSProperties = { transform: "rotate(45deg)" };
+
+function StartMarker() {
+  return (
+    <div style={{ ...markerBase, background: "#10B981" }}>
+      <span style={emojiStyle}>🏭</span>
+    </div>
+  );
+}
+
+function DestinationMarker() {
+  return (
+    <div style={{ ...markerBase, background: "#EF4444" }}>
+      <span style={emojiStyle}>📦</span>
+    </div>
+  );
+}
+
+function VehicleMarker({ vehicleType }: { vehicleType: string }) {
+  const emoji = vehicleType === "DRONE" ? "🚁" : "🤖";
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 40,
+        height: 40,
+        borderRadius: "50%",
+        background: "#4F6EF7",
+        border: "2.5px solid #fff",
+        boxShadow: "0 2px 8px rgba(79,110,247,0.45)",
+        fontSize: 20,
+      }}
+    >
+      {emoji}
+    </div>
+  );
+}
+
+// ── Polyline overlay (straight line start → destination) ─────────────────────
+
+interface RouteOverlayProps {
+  start: google.maps.LatLngLiteral;
+  destination: google.maps.LatLngLiteral;
+}
+
+function RouteOverlay({ start, destination }: RouteOverlayProps) {
+  const map = useMap();
+  const mapsLib = useMapsLibrary("maps");
+
+  useEffect(() => {
+    if (!map || !mapsLib) return;
+
+    const polyline = new mapsLib.Polyline({
+      path: [start, destination],
+      strokeColor: "#4F6EF7",
+      strokeOpacity: 0,
+      strokeWeight: 3,
+      icons: [
+        {
+          icon: { path: "M 0,-1 0,1", strokeOpacity: 0.7, scale: 3 },
+          offset: "0",
+          repeat: "16px",
+        },
+      ],
+      map,
+    });
+
+    return () => polyline.setMap(null);
+  }, [map, mapsLib, start.lat, start.lng, destination.lat, destination.lng]);
+
+  return null;
+}
+
+// ── fitBounds on first load ───────────────────────────────────────────────────
+
+interface FitBoundsProps {
+  points: (google.maps.LatLngLiteral | null)[];
+}
+
+function FitBoundsOnce({ points }: FitBoundsProps) {
+  const map = useMap();
+  const hasFit = useRef(false);
+
+  useEffect(() => {
+    if (hasFit.current || !map) return;
+    const valid = points.filter(Boolean) as google.maps.LatLngLiteral[];
+    if (valid.length < 2) return;
+
+    const bounds = new google.maps.LatLngBounds();
+    valid.forEach((p) => bounds.extend(p));
+    map.fitBounds(bounds, 64);
+    hasFit.current = true;
+  }, [map, points]);
+
+  return null;
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 
 export function TrackingPage() {
   const { orderId } = useParams<{ orderId: string }>();
@@ -88,15 +210,22 @@ export function TrackingPage() {
   const isDelivered = tracking?.status === "DELIVERED";
   const pin = tracking?.handoff_pin ?? sessionStorage.getItem("handoffPin") ?? "----";
 
-  const vehiclePosition =
+  const vehiclePosition: google.maps.LatLngLiteral | null =
     tracking != null
-      ? {
-          lat: Number(tracking.sim_lat),
-          lng: Number(tracking.sim_lng),
-        }
+      ? { lat: Number(tracking.sim_lat), lng: Number(tracking.sim_lng) }
       : null;
 
-  const mapCenter = vehiclePosition ?? { lat: 37.7749, lng: -122.4194 };
+  const startPosition: google.maps.LatLngLiteral | null =
+    tracking?.start_lat != null && tracking?.start_lng != null
+      ? { lat: Number(tracking.start_lat), lng: Number(tracking.start_lng) }
+      : null;
+
+  const dropoffPosition: google.maps.LatLngLiteral | null =
+    tracking?.dropoff_lat != null && tracking?.dropoff_lng != null
+      ? { lat: Number(tracking.dropoff_lat), lng: Number(tracking.dropoff_lng) }
+      : null;
+
+  const defaultCenter = vehiclePosition ?? { lat: 37.7749, lng: -122.4194 };
 
   if (loading) {
     return (
@@ -145,30 +274,69 @@ export function TrackingPage() {
         <Alert message={error} type="error" showIcon style={{ marginBottom: 16 }} />
       ) : null}
 
+      {/* Map legend */}
+      {GOOGLE_MAPS_API_KEY && (
+        <div
+          style={{
+            display: "flex",
+            gap: 16,
+            marginBottom: 8,
+            fontSize: 12,
+            color: "#6B7280",
+            flexWrap: "wrap",
+          }}
+        >
+          <span>🏭 <span style={{ color: "#10B981", fontWeight: 600 }}>Pickup center</span></span>
+          <span>🤖/🚁 <span style={{ color: "#4F6EF7", fontWeight: 600 }}>Vehicle</span></span>
+          <span>📦 <span style={{ color: "#EF4444", fontWeight: 600 }}>Destination</span></span>
+        </div>
+      )}
+
       <div
         style={{
           borderRadius: 16,
           overflow: "hidden",
-          height: 300,
+          height: 320,
           marginBottom: 24,
         }}
       >
         {GOOGLE_MAPS_API_KEY ? (
           <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
             <Map
-              defaultCenter={mapCenter}
-              center={vehiclePosition ?? mapCenter}
-              defaultZoom={15}
-              zoom={15}
+              defaultCenter={defaultCenter}
+              defaultZoom={14}
               gestureHandling="greedy"
               disableDefaultUI={false}
+              mapId="tracking-map"
             >
-              {vehiclePosition ? (
-                <Marker
-                  position={vehiclePosition}
-                  title={tracking?.vehicle_type === "DRONE" ? "Drone" : "Robot"}
-                />
-              ) : null}
+              {/* Auto-fit bounds on first load when all points are known */}
+              <FitBoundsOnce points={[startPosition, vehiclePosition, dropoffPosition]} />
+
+              {/* Dashed polyline from start → destination */}
+              {startPosition && dropoffPosition && (
+                <RouteOverlay start={startPosition} destination={dropoffPosition} />
+              )}
+
+              {/* Start marker — green */}
+              {startPosition && (
+                <AdvancedMarker position={startPosition} title="Pickup center">
+                  <StartMarker />
+                </AdvancedMarker>
+              )}
+
+              {/* Destination marker — red */}
+              {dropoffPosition && (
+                <AdvancedMarker position={dropoffPosition} title="Destination">
+                  <DestinationMarker />
+                </AdvancedMarker>
+              )}
+
+              {/* Vehicle marker — blue, updates every 3 s */}
+              {vehiclePosition && (
+                <AdvancedMarker position={vehiclePosition} title={tracking?.vehicle_type ?? "Vehicle"}>
+                  <VehicleMarker vehicleType={tracking?.vehicle_type ?? "ROBOT"} />
+                </AdvancedMarker>
+              )}
             </Map>
           </APIProvider>
         ) : (
