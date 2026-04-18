@@ -204,7 +204,7 @@ export function getMe(): Promise<AppUserSummary> {
 //         intentionally ignores it to keep email immutable.
 
 export interface UpdateProfileRequest {
-  fullName: string;
+  full_name: string;
   phone: string;
 }
 
@@ -314,13 +314,13 @@ export function payOrder(
 export type OrderStatus = "PENDING" | "IN_TRANSIT" | "DELIVERED" | "CANCELLED";
 
 export interface OrderSummary {
-  orderId: string;
+  order_id: string;
   status: OrderStatus;
-  dropoffSummary: string;
-  vehicleTypeChosen: string | null;
-  totalAmount: number;
+  dropoff_summary: string;
+  vehicle_type_chosen: string | null;
+  total_amount: number;
   currency: string;
-  createdAt: string;
+  created_at: string;
 }
 
 export function getMyOrders(): Promise<OrderSummary[]> {

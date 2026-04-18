@@ -104,7 +104,7 @@ export function OrderHistoryPage() {
                   label: order.status,
                   color: "#999",
                 };
-                const dateStr = new Date(order.createdAt).toLocaleDateString(
+                const dateStr = new Date(order.created_at).toLocaleDateString(
                     "zh-CN",
                     { year: "numeric", month: "2-digit", day: "2-digit" }
                 );
@@ -113,7 +113,7 @@ export function OrderHistoryPage() {
 
                 return (
                     <div
-                        key={order.orderId}
+                        key={order.order_id}
                         style={{
                           background: "#fff",
                           border: "1.5px solid #E5EAFF",
@@ -147,7 +147,7 @@ export function OrderHistoryPage() {
                               fontFamily: "monospace",
                             }}
                         >
-                          {order.orderId.slice(0, 8).toUpperCase()}
+                          {order.order_id.slice(0, 8).toUpperCase()}
                         </div>
                         <div
                             style={{
@@ -158,11 +158,11 @@ export function OrderHistoryPage() {
                               whiteSpace: "nowrap",
                             }}
                         >
-                          → {order.dropoffSummary}
+                          → {order.dropoff_summary}
                         </div>
-                        {order.vehicleTypeChosen && (
+                        {order.vehicle_type_chosen && (
                             <div style={{ fontSize: 11, color: "#C4CCDD", marginTop: 2 }}>
-                              {order.vehicleTypeChosen}
+                              {order.vehicle_type_chosen}
                             </div>
                         )}
                       </div>
@@ -207,7 +207,7 @@ export function OrderHistoryPage() {
                             }}
                         >
                           {order.currency === "USD" ? "$" : ""}
-                          {Number(order.totalAmount).toFixed(2)}
+                          {Number(order.total_amount).toFixed(2)}
                         </div>
 
                         {isDelivered && (
@@ -216,7 +216,7 @@ export function OrderHistoryPage() {
                                 icon={<ArrowRightOutlined />}
                                 iconPosition="end"
                                 onClick={() =>
-                                    navigate(`/orders/${order.orderId}/detail`)
+                                    navigate(`/orders/${order.order_id}/detail`)
                                 }
                                 style={{
                                   color: "#52C41A",
@@ -235,7 +235,7 @@ export function OrderHistoryPage() {
                                 icon={<ArrowRightOutlined />}
                                 iconPosition="end"
                                 onClick={() =>
-                                    navigate(`/orders/${order.orderId}/tracking`)
+                                    navigate(`/orders/${order.order_id}/tracking`)
                                 }
                                 style={{
                                   color: "#4F6EF7",

@@ -61,7 +61,7 @@ export function ProfilePage() {
     setSaveSuccess(false);
     setSaveError(null);
 
-    updateProfile({ fullName: values.fullName, phone: values.phone })
+    updateProfile({ full_name: values.fullName, phone: values.phone })
       .then((updated) => {
         setInitialData(updated);
         setSaveSuccess(true);
