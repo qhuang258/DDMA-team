@@ -18,7 +18,6 @@ import {
   ArrowLeftOutlined,
   ArrowRightOutlined,
   CheckCircleFilled,
-  CheckCircleOutlined,
   CloseCircleOutlined,
   EnvironmentFilled,
   EnvironmentOutlined,
@@ -26,15 +25,15 @@ import {
 } from "@ant-design/icons";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import {
   addParcel,
   createOrder,
   fetchCenters,
-  validateAddress,
-  type AddressValidateResponse,
   type DeliveryCenter,
   type PackageSizeTier,
 } from "../../api/client";
+import { AddressAutocomplete } from "../../components/AddressAutocomplete";
 
 const { Title, Text } = Typography;
 
@@ -110,9 +109,10 @@ export function OrderWizardPage() {
 
   const [pickupAddress, setPickupAddress] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
-  const [deliveryValidation, setDeliveryValidation] =
-    useState<AddressValidateResponse | null>(null);
-  const [validating, setValidating] = useState(false);
+  const [dropoffLat, setDropoffLat] = useState<number | null>(null);
+  const [dropoffLng, setDropoffLng] = useState<number | null>(null);
+  // Show errors only after the user has attempted to advance
+  const [stepAttempted, setStepAttempted] = useState(false);
 
   const [packageSize, setPackageSize] = useState<PackageSizeTier>("M");
   const [weight, setWeight] = useState<number>(1);
@@ -161,39 +161,12 @@ export function OrderWizardPage() {
     [centers, selectedCenterId],
   );
 
+  // Auto-populate pickup address from the selected center's address
   useEffect(() => {
-    const trimmedAddress = deliveryAddress.trim();
-
-    if (trimmedAddress.length < 5) {
-      setDeliveryValidation(null);
-      setValidating(false);
-      return;
+    if (selectedCenter?.addressLine) {
+      setPickupAddress(selectedCenter.addressLine);
     }
-
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      try {
-        setValidating(true);
-        const result = await validateAddress({ address: trimmedAddress });
-        if (!cancelled) {
-          setDeliveryValidation(result);
-        }
-      } catch {
-        if (!cancelled) {
-          setDeliveryValidation(null);
-        }
-      } finally {
-        if (!cancelled) {
-          setValidating(false);
-        }
-      }
-    }, 600);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [deliveryAddress]);
+  }, [selectedCenter]);
 
   const selectedPackage = useMemo(
     () => PACKAGE_OPTIONS.find((option) => option.key === packageSize) ?? PACKAGE_OPTIONS[1],
@@ -206,16 +179,11 @@ export function OrderWizardPage() {
     }
   }, [selectedPackage.maxWeight, weight]);
 
-  const deliveryValidationFailed =
-    deliveryAddress.trim().length >= 5 &&
-    deliveryValidation !== null &&
-    !deliveryValidation.valid;
+  // Dropoff is valid only when the user has picked a real place from the autocomplete
+  const dropoffValid = dropoffLat !== null && dropoffLng !== null;
+  const showDropoffError = stepAttempted && !dropoffValid;
 
-  const canContinueFromAddress =
-    !!selectedCenterId &&
-    pickupAddress.trim().length > 0 &&
-    deliveryAddress.trim().length > 0 &&
-    !deliveryValidationFailed;
+  const canContinueFromAddress = !!selectedCenterId && pickupAddress.trim().length > 0 && dropoffValid;
 
   const canSubmit =
     canContinueFromAddress &&
@@ -223,9 +191,13 @@ export function OrderWizardPage() {
     weight <= selectedPackage.maxWeight;
 
   const handleNext = () => {
-    if (current === 0 && !canContinueFromAddress) {
-      return;
+    if (current === 0) {
+      if (!canContinueFromAddress) {
+        setStepAttempted(true);
+        return;
+      }
     }
+    setStepAttempted(false);
     setCurrent((step) => step + 1);
   };
 
@@ -250,6 +222,8 @@ export function OrderWizardPage() {
         pickup_lat: selectedCenter.latitude,
         pickup_lng: selectedCenter.longitude,
         dropoff_address: deliveryAddress.trim(),
+        dropoff_lat: dropoffLat,
+        dropoff_lng: dropoffLng,
       });
 
       const parcel = await addParcel(order.order_id, {
@@ -270,8 +244,8 @@ export function OrderWizardPage() {
           pickupLat: selectedCenter.latitude,
           pickupLng: selectedCenter.longitude,
           dropoffAddress: deliveryAddress.trim(),
-          dropoffLat: null,
-          dropoffLng: null,
+          dropoffLat,
+          dropoffLng,
           parcel: {
             parcelId: parcel.parcel_id,
             sizeTier: packageSize,
@@ -291,79 +265,85 @@ export function OrderWizardPage() {
 
   const addressStep = (
     <Space direction="vertical" size={20} style={{ width: "100%", maxWidth: 620 }}>
-      <div>
-        <Text strong style={{ display: "block", marginBottom: 8 }}>
-          Delivery center
-        </Text>
-        {loadingCenters ? (
-          <Spin />
-        ) : centersError ? (
-          <Alert type="error" showIcon message={centersError} />
-        ) : (
-          <Select
-            size="large"
-            style={{ width: "100%" }}
-            placeholder="Select a delivery center"
-            options={centers}
-            value={selectedCenterId}
-            onChange={setSelectedCenterId}
-          />
-        )}
-      </div>
-
-      <Card bordered={false} style={{ background: "#F7F9FF" }}>
-        <Space direction="vertical" size={16} style={{ width: "100%" }}>
-          <div>
-            <Text strong style={{ display: "block", marginBottom: 8 }}>
-              Pickup address
-            </Text>
-            <Input
+        <div>
+          <Text strong style={{ display: "block", marginBottom: 8 }}>
+            Delivery center
+          </Text>
+          {loadingCenters ? (
+            <Spin />
+          ) : centersError ? (
+            <Alert type="error" showIcon message={centersError} />
+          ) : (
+            <Select
               size="large"
-              prefix={<EnvironmentFilled style={{ color: "#4F6EF7" }} />}
-              placeholder="Enter the pickup address"
-              value={pickupAddress}
-              onChange={(event) => setPickupAddress(event.target.value)}
+              style={{ width: "100%" }}
+              placeholder="Select a delivery center"
+              options={centers}
+              value={selectedCenterId}
+              onChange={setSelectedCenterId}
             />
-          </div>
+          )}
+        </div>
 
-          <div>
-            <Text strong style={{ display: "block", marginBottom: 8 }}>
-              Dropoff address
-            </Text>
-            <Input
-              size="large"
-              prefix={<EnvironmentOutlined style={{ color: "#10B981" }} />}
-              placeholder="Enter the dropoff address"
-              value={deliveryAddress}
-              onChange={(event) => setDeliveryAddress(event.target.value)}
-              suffix={validating ? <Spin size="small" /> : null}
-            />
+        <Card bordered={false} style={{ background: "#F7F9FF" }}>
+          <Space direction="vertical" size={16} style={{ width: "100%" }}>
+            <div>
+              <Text strong style={{ display: "block", marginBottom: 8 }}>
+                Pickup address
+              </Text>
+              <Input
+                size="large"
+                prefix={<EnvironmentFilled style={{ color: "#4F6EF7" }} />}
+                value={pickupAddress}
+                disabled
+              />
+            </div>
 
-            {!validating && deliveryValidation !== null ? (
-              <div style={{ marginTop: 10 }}>
-                {deliveryValidation.valid ? (
-                  <Tag icon={<CheckCircleOutlined />} color="success">
-                    In service area
-                  </Tag>
-                ) : (
+            <div>
+              <Text strong style={{ display: "block", marginBottom: 8 }}>
+                Dropoff address
+              </Text>
+              <AddressAutocomplete
+                placeholder="Enter the dropoff address"
+                prefix={<EnvironmentOutlined style={{ color: "#10B981" }} />}
+                status={showDropoffError ? "error" : ""}
+                onSelect={(address, lat, lng) => {
+                  setDeliveryAddress(address);
+                  setDropoffLat(lat);
+                  setDropoffLng(lng);
+                }}
+                onClear={() => {
+                  setDeliveryAddress("");
+                  setDropoffLat(null);
+                  setDropoffLng(null);
+                }}
+              />
+              {showDropoffError && (
+                <div style={{ marginTop: 8 }}>
                   <Tag icon={<CloseCircleOutlined />} color="error">
-                    Outside service area
+                    Please select an address from the suggestions
                   </Tag>
-                )}
-              </div>
-            ) : null}
-          </div>
+                </div>
+              )}
+              {dropoffValid && (
+                <div style={{ marginTop: 8 }}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    {`${dropoffLat!.toFixed(5)}, ${dropoffLng!.toFixed(5)}`}
+                  </Text>
+                </div>
+              )}
+            </div>
 
-          {selectedCenter?.addressLine ? (
-            <Alert
-              type="info"
-              showIcon
-              message={`Selected center address: ${selectedCenter.addressLine}`}
-            />
-          ) : null}
-        </Space>
-      </Card>
-    </Space>
+            {selectedCenter?.addressLine ? (
+              <Alert
+                type="info"
+                showIcon
+                message={`Selected center address: ${selectedCenter.addressLine}`}
+              />
+            ) : null}
+          </Space>
+        </Card>
+      </Space>
   );
 
   const packageStep = (
@@ -536,7 +516,6 @@ export function OrderWizardPage() {
             iconPosition="end"
             size="large"
             onClick={handleNext}
-            disabled={current === 0 && !canContinueFromAddress}
           >
             Next
           </Button>

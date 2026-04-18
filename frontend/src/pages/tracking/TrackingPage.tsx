@@ -11,7 +11,6 @@ import {
 import { useNavigate, useParams } from "react-router-dom";
 import {
   AdvancedMarker,
-  APIProvider,
   Map,
   useMap,
   useMapsLibrary,
@@ -28,7 +27,7 @@ const STEPS = [
   { icon: <CheckCircleOutlined />, label: "Delivered" },
 ];
 
-const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
+
 
 function getStepIndex(status: string): number {
   switch (status) {
@@ -275,22 +274,20 @@ export function TrackingPage() {
       ) : null}
 
       {/* Map legend */}
-      {GOOGLE_MAPS_API_KEY && (
-        <div
-          style={{
-            display: "flex",
-            gap: 16,
-            marginBottom: 8,
-            fontSize: 12,
-            color: "#6B7280",
-            flexWrap: "wrap",
-          }}
-        >
-          <span>🏭 <span style={{ color: "#10B981", fontWeight: 600 }}>Pickup center</span></span>
-          <span>🤖/🚁 <span style={{ color: "#4F6EF7", fontWeight: 600 }}>Vehicle</span></span>
-          <span>📦 <span style={{ color: "#EF4444", fontWeight: 600 }}>Destination</span></span>
-        </div>
-      )}
+      <div
+        style={{
+          display: "flex",
+          gap: 16,
+          marginBottom: 8,
+          fontSize: 12,
+          color: "#6B7280",
+          flexWrap: "wrap",
+        }}
+      >
+        <span>🏭 <span style={{ color: "#10B981", fontWeight: 600 }}>Pickup center</span></span>
+        <span>🤖/🚁 <span style={{ color: "#4F6EF7", fontWeight: 600 }}>Vehicle</span></span>
+        <span>📦 <span style={{ color: "#EF4444", fontWeight: 600 }}>Destination</span></span>
+      </div>
 
       <div
         style={{
@@ -300,70 +297,42 @@ export function TrackingPage() {
           marginBottom: 24,
         }}
       >
-        {GOOGLE_MAPS_API_KEY ? (
-          <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
-            <Map
-              defaultCenter={defaultCenter}
-              defaultZoom={14}
-              gestureHandling="greedy"
-              disableDefaultUI={false}
-              mapId="tracking-map"
-            >
-              {/* Auto-fit bounds on first load when all points are known */}
-              <FitBoundsOnce points={[startPosition, vehiclePosition, dropoffPosition]} />
+        <Map
+          defaultCenter={defaultCenter}
+          defaultZoom={14}
+          gestureHandling="greedy"
+          disableDefaultUI={false}
+          mapId="tracking-map"
+        >
+          {/* Auto-fit bounds on first load when all points are known */}
+          <FitBoundsOnce points={[startPosition, vehiclePosition, dropoffPosition]} />
 
-              {/* Dashed polyline from start → destination */}
-              {startPosition && dropoffPosition && (
-                <RouteOverlay start={startPosition} destination={dropoffPosition} />
-              )}
+          {/* Dashed polyline from start → destination */}
+          {startPosition && dropoffPosition && (
+            <RouteOverlay start={startPosition} destination={dropoffPosition} />
+          )}
 
-              {/* Start marker — green */}
-              {startPosition && (
-                <AdvancedMarker position={startPosition} title="Pickup center">
-                  <StartMarker />
-                </AdvancedMarker>
-              )}
+          {/* Start marker — green */}
+          {startPosition && (
+            <AdvancedMarker position={startPosition} title="Pickup center">
+              <StartMarker />
+            </AdvancedMarker>
+          )}
 
-              {/* Destination marker — red */}
-              {dropoffPosition && (
-                <AdvancedMarker position={dropoffPosition} title="Destination">
-                  <DestinationMarker />
-                </AdvancedMarker>
-              )}
+          {/* Destination marker — red */}
+          {dropoffPosition && (
+            <AdvancedMarker position={dropoffPosition} title="Destination">
+              <DestinationMarker />
+            </AdvancedMarker>
+          )}
 
-              {/* Vehicle marker — blue, updates every 3 s */}
-              {vehiclePosition && (
-                <AdvancedMarker position={vehiclePosition} title={tracking?.vehicle_type ?? "Vehicle"}>
-                  <VehicleMarker vehicleType={tracking?.vehicle_type ?? "ROBOT"} />
-                </AdvancedMarker>
-              )}
-            </Map>
-          </APIProvider>
-        ) : (
-          <div
-            style={{
-              alignItems: "center",
-              background: "linear-gradient(135deg, #E8F1FF 0%, #F7F9FF 100%)",
-              color: "#1A1D2E",
-              display: "flex",
-              height: "100%",
-              justifyContent: "center",
-              padding: 24,
-              textAlign: "center",
-            }}
-          >
-            <div>
-              <div style={{ fontWeight: 700, marginBottom: 8 }}>
-                Google Maps API key is missing
-              </div>
-              <div>
-                {vehiclePosition
-                  ? `Vehicle at ${vehiclePosition.lat.toFixed(5)}, ${vehiclePosition.lng.toFixed(5)}`
-                  : "Tracking coordinates are not available yet."}
-              </div>
-            </div>
-          </div>
-        )}
+          {/* Vehicle marker — blue, updates every 3 s */}
+          {vehiclePosition && (
+            <AdvancedMarker position={vehiclePosition} title={tracking?.vehicle_type ?? "Vehicle"}>
+              <VehicleMarker vehicleType={tracking?.vehicle_type ?? "ROBOT"} />
+            </AdvancedMarker>
+          )}
+        </Map>
       </div>
 
       {isDelivered ? (

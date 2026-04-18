@@ -7,6 +7,8 @@ import com.laioffer.deliverymanagement.dto.FleetVehicleDto;
 import com.laioffer.deliverymanagement.dto.OrderDto;
 import com.laioffer.deliverymanagement.dto.OrderParcelDto;
 import com.laioffer.deliverymanagement.service.*;
+import com.laioffer.deliverymanagement.validation.AddressValidateRequest;
+import com.laioffer.deliverymanagement.validation.AddressValidationService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
@@ -28,6 +30,7 @@ public class OrderController {
     private final DeliveryCenterService deliveryCenterService;
     private final FleetVehicleService fleetVehicleService;
     private final PaymentService paymentService;
+    private final AddressValidationService addressValidationService;
     private final Random random = new Random();
 
     public OrderController(
@@ -35,13 +38,15 @@ public class OrderController {
             OrderParcelService orderParcelService,
             DeliveryCenterService deliveryCenterService,
             FleetVehicleService fleetVehicleService,
-            PaymentService paymentService
+            PaymentService paymentService,
+            AddressValidationService addressValidationService
     ) {
         this.orderService = orderService;
         this.orderParcelService = orderParcelService;
         this.deliveryCenterService = deliveryCenterService;
         this.fleetVehicleService = fleetVehicleService;
         this.paymentService = paymentService;
+        this.addressValidationService = addressValidationService;
     }
 
     @GetMapping("/me")
@@ -73,11 +78,26 @@ public class OrderController {
             throw new ApiException(404, "CENTER_NOT_FOUND", "Delivery center not found.");
         }
 
+        // Validate dropoff address is within the SF service area
+        var dropoffValidation = addressValidationService.validate(new AddressValidateRequest(
+                request.dropoffAddress(),
+                request.dropoffLat() != null ? request.dropoffLat().doubleValue() : null,
+                request.dropoffLng() != null ? request.dropoffLng().doubleValue() : null
+        ));
+        if (!dropoffValidation.valid()) {
+            throw new ApiException(422, "ADDRESS_OUT_OF_SERVICE_AREA",
+                    "Dropoff address is outside our San Francisco service area.");
+        }
+
         OrderDto order = orderService.createOrder(
                 user.id(),
                 request.centerId(),
                 request.pickupAddress(),
-                request.dropoffAddress()
+                request.pickupLat(),
+                request.pickupLng(),
+                request.dropoffAddress(),
+                request.dropoffLat(),
+                request.dropoffLng()
         );
         return new CreateOrderResponse(order.id(), order.status(), order.createdAt());
     }

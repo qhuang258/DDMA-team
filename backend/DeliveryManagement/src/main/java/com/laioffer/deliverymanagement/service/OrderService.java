@@ -40,9 +40,24 @@ public class OrderService {
             UUID userId,
             UUID centerId,
             String pickupSummary,
-            String dropoffSummary
+            BigDecimal pickupLat,
+            BigDecimal pickupLng,
+            String dropoffSummary,
+            BigDecimal dropoffLat,
+            BigDecimal dropoffLng
     ) {
         OffsetDateTime now = OffsetDateTime.now();
+
+        // Store real geocoded dropoff coordinates immediately so payment step preserves them
+        Jsonb trackingState = null;
+        if (dropoffLat != null && dropoffLng != null) {
+            String json = String.format(
+                    "{\"lastEvent\":\"CREATED\",\"dropoffLat\":%s,\"dropoffLng\":%s}",
+                    dropoffLat.toPlainString(), dropoffLng.toPlainString()
+            );
+            trackingState = Jsonb.of(json);
+        }
+
         OrderEntity saved = repository.save(new OrderEntity(
                 null,
                 userId,
@@ -61,7 +76,7 @@ public class OrderService {
                 null,
                 null,
                 null,
-                null,
+                trackingState,
                 now,
                 now,
                 0,
