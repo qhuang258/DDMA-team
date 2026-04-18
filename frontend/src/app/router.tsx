@@ -11,6 +11,7 @@ import { PaymentPage } from '@/pages/checkout/PaymentPage';
 import { OrderConfirmationPage } from '@/pages/checkout/OrderConfirmationPage';
 import { TrackingPage } from '@/pages/tracking/TrackingPage';
 import { OrderHistoryPage } from '@/pages/history/OrderHistoryPage';
+import { OrderDetailPage } from '@/pages/history/OrderDetailPage';
 import { ProfilePage } from '@/pages/profile/ProfilePage';
 
 /**
@@ -36,6 +37,7 @@ export function AppRouter() {
         <Route path="checkout/pay" element={<PaymentPage />} />
         <Route path="checkout/confirmation" element={<OrderConfirmationPage />} />
         <Route path="orders/:orderId/tracking" element={<TrackingPage />} />
+        <Route path="orders/:orderId/detail" element={<OrderDetailPage />} />
         <Route path="history" element={<OrderHistoryPage />} />
         <Route path="profile" element={<ProfilePage />} />
       </Route>
