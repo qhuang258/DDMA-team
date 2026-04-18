@@ -2,26 +2,19 @@ package com.laioffer.deliverymanagement.controller;
 
 import com.laioffer.deliverymanagement.api.ApiException;
 import com.laioffer.deliverymanagement.auth.AuthenticatedUser;
-import com.laioffer.deliverymanagement.dto.FleetVehicleDto;
 import com.laioffer.deliverymanagement.dto.DeliveryCenterDto;
+import com.laioffer.deliverymanagement.dto.FleetVehicleDto;
 import com.laioffer.deliverymanagement.dto.OrderDto;
 import com.laioffer.deliverymanagement.dto.OrderParcelDto;
-import com.laioffer.deliverymanagement.service.DeliveryCenterService;
-import com.laioffer.deliverymanagement.service.FleetVehicleService;
-import com.laioffer.deliverymanagement.service.OrderParcelService;
-import com.laioffer.deliverymanagement.service.OrderService;
-import com.laioffer.deliverymanagement.service.PaymentService;
+import com.laioffer.deliverymanagement.service.*;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -49,6 +42,27 @@ public class OrderController {
         this.deliveryCenterService = deliveryCenterService;
         this.fleetVehicleService = fleetVehicleService;
         this.paymentService = paymentService;
+    }
+
+    @GetMapping("/me")
+    public List<OrderSummaryResponse> getMyOrders(
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        if (user == null) {
+            throw new ApiException(401, "TOKEN_MISSING",
+                    "Authorization header with Bearer token is required.");
+        }
+        return orderService.findByUserId(user.id())
+                .stream()
+                .map(order -> new OrderSummaryResponse(
+                        order.id(),
+                        order.status(),
+                        order.dropoffSummary(),
+                        order.vehicleTypeChosen(),
+                        order.totalAmount() != null ? order.totalAmount() : BigDecimal.ZERO,
+                        order.currency() != null ? order.currency() : "USD",
+                        order.createdAt()
+                ))
+                .toList();
     }
 
     @PostMapping

@@ -311,6 +311,23 @@ export function payOrder(
   });
 }
 
+export type OrderStatus = "PENDING" | "IN_TRANSIT" | "DELIVERED" | "CANCELLED";
+
+export interface OrderSummary {
+  orderId: string;
+  status: OrderStatus;
+  dropoffSummary: string;
+  vehicleTypeChosen: string | null;
+  totalAmount: number;
+  currency: string;
+  createdAt: string;
+}
+
+export function getMyOrders(): Promise<OrderSummary[]> {
+  return request<OrderSummary[]>("/api/v1/orders/me", {
+    method: "GET",
+  });
+}
 // ================== TRACKING ==================
 
 export interface TrackingState {
