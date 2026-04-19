@@ -1,4 +1,4 @@
-const BASE_URL = "http://localhost:8080";
+const BASE_URL = "";
 
 interface RequestOptions extends Omit<RequestInit, "body" | "headers"> {
   headers?: HeadersInit;
@@ -208,7 +208,9 @@ export interface UpdateProfileRequest {
   phone: string;
 }
 
-export function updateProfile(body: UpdateProfileRequest): Promise<AppUserSummary> {
+export function updateProfile(
+  body: UpdateProfileRequest,
+): Promise<AppUserSummary> {
   return request<AppUserSummary>("/api/v1/users/me", {
     method: "PUT",
     body: JSON.stringify(body),

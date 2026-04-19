@@ -2,3 +2,5 @@
 .idea/
 .gradle-cache/
 backend/DeliveryManagement/build/
+.env
+.env.local

@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:15.2-alpine
+    environment:
+      POSTGRES_DB: ddma
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - ddma-pg-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  backend:
+    build:
+      context: ./backend/DeliveryManagement
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: db
+      DATABASE_PORT: 5432
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: secret
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY}
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  ddma-pg-data:
